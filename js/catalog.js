@@ -25,7 +25,7 @@
         id: 'polo',
         category: 'gear',
         name: 'Polo',
-        detail: 'Sport-Tek ST640',
+        detail: 'Sport-Tek ST550',
         blurb: 'Embroidered logo on the left chest. Optional agent name on the sleeve.',
         price: 34.49,
         priceXXL: 35.84,
@@ -67,6 +67,7 @@
         category: 'signs',
         name: 'For Sale Sign',
         detail: '18×24 Plastic',
+        image: { w: 1800, h: 2400 },
         blurb: 'Plastic rider sign, printed with your photo and contact details.',
         variants: [
           { id: 'single', label: 'Single', price: 60 },
@@ -82,6 +83,7 @@
         category: 'signs',
         name: 'For Sale Sign',
         detail: '18×24 Aluminum',
+        image: { w: 1800, h: 2400 },
         blurb: 'Aluminum rider sign, printed with your photo and contact details.',
         variants: [
           { id: 'single', label: 'Single', price: 85 },

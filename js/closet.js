@@ -5,10 +5,10 @@ const Cat = window.ShopCatalog;
 const Cart = window.ShopCart;
 
 const SPECS = [
-  { sku: 't-shirt', hang: 't-shirt', w: 0.96, h: 1.05 },
-  { sku: 'polo', hang: 'polo', w: 0.82, h: 0.72, file: 'hang' },
-  { sku: 'quarter-zip', hang: 'quarter-zip', w: 1.02, h: 1.02 },
-  { sku: 'cap', hang: 'cap', w: 0.62, h: 0.46 }
+  { sku: 't-shirt', hang: 't-shirt', w: 0.96, h: 1.05, emblem: true },
+  { sku: 'polo', hang: 'polo', w: 0.84, h: 1.05, emblem: true },
+  { sku: 'quarter-zip', hang: 'quarter-zip', w: 1.02, h: 1.02, emblem: true },
+  { sku: 'cap', hang: 'cap', w: 0.62, h: 0.46, emblem: false }
 ];
 
 function boot() {
@@ -107,15 +107,23 @@ function boot() {
   Promise.all(SPECS.map(async function (spec, index) {
     const maps = {};
     for (const color of ['black', 'white']) {
-      const name = spec.file === 'hang'
-        ? spec.hang + '-' + color + '-hang.png'
-        : spec.hang + '-' + color + '-front.png';
-      maps[color] = await loadMap(window.SHOP_BASE + 'assets/gear/' + name);
+      const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
+      maps[color] = {
+        front: await loadMap(base + '-front.png'),
+        back: await loadMap(base + '-back.png'),
+        backEmblem: spec.emblem ? await loadMap(base + '-back-emblem.png') : null
+      };
     }
     const group = new THREE.Group();
-    const cloth = curved(maps.black, spec.w, spec.h);
-    cloth.position.y = spec.sku === 'cap' ? -0.28 : -spec.h * 0.48 - 0.08;
-    group.add(cloth);
+    const y = spec.sku === 'cap' ? -0.28 : -spec.h * 0.48 - 0.08;
+    const cloth = curved(maps.black.front, spec.w, spec.h);
+    cloth.position.y = y;
+    const backCloth = curved(maps.black.back, spec.w, spec.h);
+    backCloth.position.y = y;
+    backCloth.material.opacity = 0;
+    backCloth.material.transparent = true;
+    backCloth.material.depthWrite = false;
+    group.add(cloth, backCloth);
     if (spec.sku !== 'cap') {
       const hook = hanger();
       group.add(hook);
@@ -127,20 +135,21 @@ function boot() {
     }
     const x = origin + index * spacing;
     group.position.set(x, 0.98, 0);
-    group.rotation.y = (index % 2 === 0 ? 1 : -1) * 0.16;
     scene.add(group);
     const piece = {
       spec: spec,
       group: group,
       cloth: cloth,
+      backCloth: backCloth,
       maps: maps,
       homeX: x,
-      homeYaw: group.rotation.y,
       homeScale: 1,
       x: x,
-      yaw: group.rotation.y,
       scale: 1,
-      opacity: 1
+      opacity: 1,
+      angle: 0,
+      frontMix: 1,
+      backMix: 0
     };
     pieces[index] = piece;
   })).then(start).catch(function () {
@@ -156,12 +165,17 @@ function boot() {
   function applyVisuals() {
     pieces.forEach(function (piece) {
       piece.group.position.x += (piece.x - piece.group.position.x) * 0.18;
-      piece.group.rotation.y += (piece.yaw - piece.group.rotation.y) * 0.18;
+      piece.group.rotation.y = 0;
       const s = piece.group.scale.x + (piece.scale - piece.group.scale.x) * 0.18;
       piece.group.scale.setScalar(s);
-      const mat = piece.cloth.material;
-      mat.opacity += (piece.opacity - mat.opacity) * 0.18;
-      mat.transparent = mat.opacity < 0.99;
+      const frontMat = piece.cloth.material;
+      const backMat = piece.backCloth.material;
+      frontMat.opacity += (piece.frontMix * piece.opacity - frontMat.opacity) * 0.22;
+      backMat.opacity += (piece.backMix * piece.opacity - backMat.opacity) * 0.22;
+      frontMat.transparent = true;
+      backMat.transparent = true;
+      frontMat.depthWrite = frontMat.opacity > 0.85;
+      backMat.depthWrite = backMat.opacity > 0.85;
     });
   }
 
@@ -172,9 +186,13 @@ function boot() {
         x += piece.homeX < focus.homeX ? -0.18 : 0.18;
       }
       piece.x = x;
-      piece.yaw = focus === piece ? 0 : piece.homeYaw;
       piece.scale = focus === piece ? 1.34 : 1;
       piece.opacity = 1;
+      if (mode !== 'detail') {
+        piece.angle = 0;
+        piece.frontMix = 1;
+        piece.backMix = 0;
+      }
     });
   }
 
@@ -182,16 +200,48 @@ function boot() {
     pieces.forEach(function (piece) {
       if (piece === focus) {
         piece.x = -0.55;
-        piece.yaw = piece.dragYaw == null ? 0 : piece.dragYaw;
         piece.scale = 1.55;
         piece.opacity = 1;
       } else {
         piece.x = piece.homeX < focus.homeX ? -1.7 : 1.7;
-        piece.yaw = piece.homeYaw;
         piece.scale = 0.92;
         piece.opacity = 0.18;
+        piece.frontMix = 1;
+        piece.backMix = 0;
       }
     });
+  }
+
+  function turntable(angle) {
+    const a = ((angle % 360) + 360) % 360;
+    if (a < 50 || a > 310) return { front: 1, back: 0 };
+    if (a < 90) {
+      const t = (a - 50) / 40;
+      return { front: 1 - t, back: t };
+    }
+    if (a < 230) return { front: 0, back: 1 };
+    if (a < 270) {
+      const t = (a - 230) / 40;
+      return { front: t, back: 1 - t };
+    }
+    return { front: 1, back: 0 };
+  }
+
+  function applyTurn(piece) {
+    const mix = turntable(piece.angle);
+    piece.frontMix = mix.front;
+    piece.backMix = mix.back;
+    const color = colorState.color;
+    const pack = piece.maps[color];
+    const backMap = (colorState.backEmblem && pack.backEmblem) ? pack.backEmblem : pack.back;
+    if (piece.cloth.material.map !== pack.front) {
+      piece.cloth.material.map = pack.front;
+      piece.cloth.material.needsUpdate = true;
+    }
+    if (piece.backCloth.material.map !== backMap) {
+      piece.backCloth.material.map = backMap;
+      piece.backCloth.material.needsUpdate = true;
+    }
   }
 
   function showPill(piece) {
@@ -210,10 +260,7 @@ function boot() {
 
   function recolor(color) {
     colorState.color = color;
-    pieces.forEach(function (piece) {
-      piece.cloth.material.map = piece.maps[color];
-      piece.cloth.material.needsUpdate = true;
-    });
+    pieces.forEach(applyTurn);
     if (active) drawSheet();
   }
 
@@ -252,7 +299,10 @@ function boot() {
     const nameText = document.getElementById('cNameText');
     if (nameText) nameText.oninput = function () { colorState.agentNameText = nameText.value; };
     const emblemBox = document.getElementById('cEmblem');
-    if (emblemBox) emblemBox.onchange = function () { colorState.backEmblem = emblemBox.checked; };
+    if (emblemBox) emblemBox.onchange = function () {
+      colorState.backEmblem = emblemBox.checked;
+      if (active) applyTurn(active);
+    };
     document.getElementById('backCloset').onclick = leave;
     document.getElementById('addCloset').onclick = function () {
       Cart.add(product.id, {
@@ -271,7 +321,8 @@ function boot() {
     hover = null;
     mode = 'detail';
     hidePill();
-    piece.dragYaw = 0;
+    piece.angle = 0;
+    applyTurn(piece);
     layoutDetail(piece);
     drawSheet();
   }
@@ -307,8 +358,8 @@ function boot() {
     if (down && mode === 'detail' && active) {
       const dx = ev.clientX - down.x;
       if (Math.abs(dx) > 4) down.moved = true;
-      active.dragYaw = dx * 0.012;
-      active.yaw = active.dragYaw;
+      active.angle = dx * 0.7;
+      applyTurn(active);
       return;
     }
     if (mode !== 'rack') return;

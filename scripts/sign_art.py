@@ -51,10 +51,10 @@ def for_sale(dark=False):
     logo = Image.open(LOGO_W if dark else LOGO_B)
     paste_logo(im, logo, W / 2, 250, 980)
     # FOR SALE
-    f = font(FONT_B, 210)
+    f = font(FONT_B, 196)
     text = "FOR SALE"
-    # tracking
-    gap = 8
+    # tracked like the sheet
+    gap = 36
     widths = [d.textlength(ch, font=f) for ch in text]
     total = sum(widths) + gap * (len(text) - 1)
     x = (W - total) / 2
@@ -62,22 +62,22 @@ def for_sale(dark=False):
     for ch, wch in zip(text, widths):
         d.text((x, y), ch, font=f, fill=fg)
         x += wch + gap
-    agent = cutout_agent(980)
-    im.alpha_composite(agent, (90, H - agent.height - 80))
-    # name block, stacked like the sheet
+    agent = cutout_agent(1040)
+    im.alpha_composite(agent, (70, H - agent.height + 30))
+    # Two-line name, same stack as ENRIQUE / ESPARZA on the sheet.
     nx = 980
-    ny = H - 860
-    d.text((nx, ny), "AGENT", font=font(FONT_B, 92), fill=fg)
-    name_f = font(FONT_B, 64)
+    ny = H - 920
+    d.text((nx, ny), "AGENT", font=font(FONT_B, 96), fill=fg)
+    name_f = font(FONT_B, 72)
     letters = "NAME"
     lw = [d.textlength(ch, font=name_f) for ch in letters]
-    gapn = 28
+    gapn = 18
     xx = nx
     for ch, wch in zip(letters, lw):
-        d.text((xx, ny + 110), ch, font=name_f, fill=fg)
+        d.text((xx, ny + 118), ch, font=name_f, fill=fg)
         xx += wch + gapn
-    d.text((nx, ny + 210), "(000) 000-0000", font=font(FONT_M, 48), fill=fg)
-    d.text((nx, ny + 275), "agent@email.com", font=font(FONT_R, 28), fill=muted)
+    d.text((nx, ny + 230), "(000) 000-0000", font=font(FONT_M, 46), fill=fg)
+    d.text((nx, ny + 292), "agent@email.com", font=font(FONT_R, 28), fill=muted)
     dre = "DRE# 00000000"
     df = font(FONT_R, 32)
     dw = d.textlength(dre, font=df)

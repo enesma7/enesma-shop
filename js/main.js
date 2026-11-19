@@ -30,7 +30,7 @@
     var cards = Cat.byCategory(cat).map(function (p) {
       var priced = Cat.priceOf(p, { color: 'black' });
       var href = cat + '/' + p.id + '/';
-      var fit = (p.id === 'open-house' || p.id === 'a-frame') ? ' natural' : '';
+      var fit = (p.category === 'signs' || p.category === 'cards') ? ' natural' : '';
       return '<a class="card" href="' + href + '"><div class="ph' + fit + '">' + picture(p.id, 'black', 'hero', p.name) + '</div>' +
         '<h2>' + h(p.name) + '</h2><p>' + h(p.detail) + '</p><p>' + (p.variants ? 'From ' : '') + Cat.money(priced.from) + '</p></a>';
     }).join('');

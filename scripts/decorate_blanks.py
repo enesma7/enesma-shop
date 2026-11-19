@@ -106,15 +106,10 @@ def decorate_tee(color):
     front = Image.open(f"{REF}/tee-{color}-3.jpg").convert("RGBA")
     back = Image.open(f"{REF}/tee-{color}-4.jpg").convert("RGBA")
     word = WORD_W if color == "black" else WORD_B
-    emb = EMB_W if color == "black" else EMB_B
     box = bbox(front)
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     paste_center(front, word, x0 + bw * 0.50, y0 + bh * 0.36, bw * 0.46)
-    boxb = bbox(back)
-    bx0, by0, bx1, by1 = boxb
-    bbw, bbh = bx1 - bx0, by1 - by0
-    paste_center(back, emb, bx0 + bbw * 0.50, by0 + bbh * 0.16, bbw * 0.13)
     save_pair(cut_white(front), "t-shirt", color, "front")
     save_pair(cut_white(front), "t-shirt", color, "hero")
     save_pair(cut_white(back), "t-shirt", color, "back")
@@ -136,42 +131,63 @@ def shirt_mask_from_black_polo():
     return mask.filter(ImageFilter.MaxFilter(3))
 
 
+POLO_FRONT = {
+    "black": f"{REF}/st550-black-1200W-9060-Black-12-ST550BlackFormFront8.jpg",
+    "white": f"{REF}/st550-white-1200W-9060-White-12-ST550WhiteFormFront8.jpg",
+}
+POLO_BACK = {
+    "black": f"{REF}/st550-black-1200W-9060-Black-13-ST550BlackFormBack8.jpg",
+    "white": f"{REF}/st550-white-1200W-9060-White-13-ST550WhiteFormBack8.jpg",
+}
+
+
+def tonal_emblem(color):
+    src = EMB_W if color == "black" else EMB_B
+    im = src.copy()
+    px = im.load()
+    # A slightly lighter or darker mark, not a bright print.
+    tone = (150, 150, 154, 210) if color == "black" else (90, 90, 94, 170)
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a < 8:
+                continue
+            px[x, y] = (tone[0], tone[1], tone[2], int(a * tone[3] / 255))
+    return im
+
+
 def decorate_polo(color):
-    im = Image.open(f"{REF}/polo-{color}-0.jpg").convert("RGBA")
-    back = Image.open(f"{REF}/polo-{color}-1.jpg").convert("RGBA")
-    im = im.crop((12, 12, im.width - 12, im.height - 12))
-    back = back.crop((12, 12, back.width - 12, back.height - 12))
+    im = Image.open(POLO_FRONT[color]).convert("RGBA")
+    back = Image.open(POLO_BACK[color]).convert("RGBA")
     word = WORD_W if color == "black" else WORD_B
-    emb = EMB_W if color == "black" else EMB_B
-    w, h = im.size
-    # Wearer's left chest on a front-facing model is right of center.
-    paste_center(im, word, w * 0.63, h * 0.40, w * 0.16)
+    box = bbox(im)
+    x0, y0, x1, y1 = box
+    bw, bh = x1 - x0, y1 - y0
+    # Wearer's left chest, and the name on that same sleeve.
+    paste_center(im, word, x0 + bw * 0.66, y0 + bh * 0.30, bw * 0.18)
     fill = (247, 247, 245, 255) if color == "black" else (20, 20, 22, 255)
-    mark = name_mark("AGENT NAME", fill, w * 0.11)
-    im.alpha_composite(mark, (int(w * 0.72), int(h * 0.46)))
-    paste_center(back, emb, w * 0.50, h * 0.28, w * 0.08)
-    save_pair(im, "polo", color, "front")
-    save_pair(im, "polo", color, "hero")
-    save_pair(back, "polo", color, "back")
-    # Closet hangs the shirt, cropped from collar to hem.
-    hang = im.crop((int(w * 0.08), int(h * 0.27), int(w * 0.94), int(h * 0.76)))
-    cut_white(hang).save(os.path.join(OUT, f"polo-{color}-hang.png"))
-    print("polo", color)
+    mark = name_mark("AGENT NAME", fill, bw * 0.16)
+    im.alpha_composite(mark, (int(x0 + bw * 0.70), int(y0 + bh * 0.40)))
+    front_cut = cut_white(im)
+    back_cut = cut_white(back)
+    save_pair(front_cut, "polo", color, "front")
+    save_pair(front_cut, "polo", color, "hero")
+    save_pair(back_cut, "polo", color, "back")
+    emblem_back = back_cut.copy()
+    paste_center(emblem_back, tonal_emblem(color), (x0 + x1) / 2, y0 + bh * 0.16, bw * 0.12)
+    emblem_back.save(os.path.join(OUT, f"polo-{color}-back-emblem.png"))
+    print("polo", color, box)
 
 
 def decorate_qzip(color):
     front = Image.open(f"{REF}/qzip-{color}-3.jpg").convert("RGBA")
     back = Image.open(f"{REF}/qzip-{color}-4.jpg").convert("RGBA")
     word = WORD_W if color == "black" else WORD_B
-    emb = EMB_W if color == "black" else EMB_B
     box = bbox(front)
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     # form is turned; place the small chest mark on the wearer's left, image-right of center
     paste_center(front, word, x0 + bw * 0.58, y0 + bh * 0.30, bw * 0.16)
-    boxb = bbox(back)
-    bx0, by0, bx1, by1 = boxb
-    paste_center(back, emb, (bx0 + bx1) / 2, by0 + (by1 - by0) * 0.16, (bx1 - bx0) * 0.10)
     save_pair(cut_white(front), "quarter-zip", color, "front")
     save_pair(cut_white(front), "quarter-zip", color, "hero")
     save_pair(cut_white(back), "quarter-zip", color, "back")
@@ -193,6 +209,35 @@ def decorate_cap(color):
     save_pair(cut, "cap", color, "hero")
     save_pair(cut, "cap", color, "back")
     print("cap", color, box)
+
+
+def alpha_box(im):
+    return im.split()[-1].point(lambda p: 255 if p > 16 else 0).getbbox()
+
+
+def stamp_backs():
+    for slug in ("t-shirt", "quarter-zip"):
+        for color in ("black", "white"):
+            im = Image.open(os.path.join(OUT, f"{slug}-{color}-back.png")).convert("RGBA")
+            box = alpha_box(im) or im.getbbox()
+            x0, y0, x1, y1 = box
+            paste_center(im, tonal_emblem(color), (x0 + x1) / 2, y0 + (y1 - y0) * 0.16, (x1 - x0) * 0.12)
+            im.save(os.path.join(OUT, f"{slug}-{color}-back-emblem.png"))
+
+
+def publish_for_sale():
+    import subprocess
+    subprocess.check_call(["python3", os.path.join(ROOT, "scripts/sign_art.py")])
+    for color in ("white", "black"):
+        art = Image.open(os.path.join(ROOT, "assets/signs", f"for-sale-{color}.png")).convert("RGB")
+        art = art.resize((1800, 2400), Image.Resampling.LANCZOS)
+        for kind in ("for-sale-plastic", "for-sale-aluminum"):
+            base = os.path.join(RENDERS, f"{kind}-{color}-hero")
+            art.save(base + ".jpg", quality=90, optimize=True)
+            art.save(base + ".webp", quality=84, method=4)
+            thumb = art.copy()
+            thumb.thumbnail((720, 960))
+            thumb.save(base + "-thumb.webp", quality=80, method=4)
 
 
 def tile():
@@ -224,6 +269,8 @@ def main():
         decorate_polo(color)
         decorate_qzip(color)
         decorate_cap(color)
+    stamp_backs()
+    publish_for_sale()
     tile()
 
 

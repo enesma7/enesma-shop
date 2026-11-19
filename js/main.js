@@ -6,8 +6,9 @@
 
   function picture(id, color, view, alt) {
     var base = Cat.renderBase(id, color, view);
+    var size = Cat.imageSize(id);
     return '<picture><source srcset="' + base + '.webp" type="image/webp">' +
-      '<img src="' + base + '.jpg" alt="' + h(alt) + '" width="1600" height="2000"></picture>';
+      '<img src="' + base + '.jpg" alt="' + h(alt) + '" width="' + size.w + '" height="' + size.h + '"></picture>';
   }
 
   function home() {
@@ -29,7 +30,8 @@
     var cards = Cat.byCategory(cat).map(function (p) {
       var priced = Cat.priceOf(p, { color: 'black' });
       var href = cat + '/' + p.id + '/';
-      return '<a class="card" href="' + href + '"><div class="ph">' + picture(p.id, 'black', 'hero', p.name) + '</div>' +
+      var fit = (p.id === 'open-house' || p.id === 'a-frame') ? ' natural' : '';
+      return '<a class="card" href="' + href + '"><div class="ph' + fit + '">' + picture(p.id, 'black', 'hero', p.name) + '</div>' +
         '<h2>' + h(p.name) + '</h2><p>' + h(p.detail) + '</p><p>' + (p.variants ? 'From ' : '') + Cat.money(priced.from) + '</p></a>';
     }).join('');
     UI.$('#content').innerHTML = '<section class="section"><h1>' + h(title) + '</h1><p class="lede">' + h(lede) + '</p><div class="grid">' + cards + '</div></section>';

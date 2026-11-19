@@ -106,15 +106,18 @@ h1, h2, h3, p { text-wrap: pretty; }
 .grid { display: grid; gap: 22px 14px; grid-template-columns: 1fr 1fr; }
 .card { text-decoration: none; display: block; }
 .card .ph { background: #f3f2ef; aspect-ratio: 4/5; overflow: hidden; }
+.card .ph.natural { aspect-ratio: auto; }
 .card .ph picture, .tile picture { display: block; height: 100%; }
+.card .ph.natural picture { height: auto; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .card img { width: 100%; height: 100%; object-fit: cover; }
+.card .ph.natural img { height: auto; object-fit: contain; }
 .card h2 { font-size: 16px; font-weight: 500; margin: 10px 0 0; }
 .card p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 
 .product { display: grid; gap: 8px; }
 .gallery { background: #f4f3f0; }
-.gallery img { width: 100%; height: auto; }
+.gallery img { width: 100%; height: auto; object-fit: contain; }
 .buy { padding: 8px 16px 28px; max-width: 560px; }
 .buy h1 { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; margin: 12px 0 0; }
 .buy .detail { color: var(--muted); margin: 4px 0 0; }
@@ -162,7 +165,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .drawer header h2 { margin: 0; font-size: 20px; font-weight: 500; }
 .drawer .lines { overflow: auto; flex: 1; padding: 0 16px; }
 .line { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
-.line img { width: 84px; height: 104px; object-fit: cover; background: #f3f2ef; }
+.line img { width: 84px; height: 104px; object-fit: contain; background: #f3f2ef; }
 .line h3 { margin: 0; font-size: 15px; font-weight: 500; }
 .line p { margin: 4px 0; color: var(--muted); font-size: 13px; }
 .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; }

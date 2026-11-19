@@ -14,7 +14,6 @@ const pages = [
   { out: 'signs/open-house/index.html', title: 'Open House Signs · ENESMA Shop', page: 'product', sku: 'open-house' },
   { out: 'signs/a-frame/index.html', title: 'Open House A-Frame · ENESMA Shop', page: 'product', sku: 'a-frame' },
   { out: 'cards/index.html', title: 'Cards · ENESMA Shop', page: 'category', category: 'cards', heading: 'Cards', lede: 'Business cards, printed with your photo and contact details.' },
-  { out: 'cards/cards-500/index.html', title: 'Business Cards · ENESMA Shop', page: 'product', sku: 'cards-500' },
   { out: 'cards/cards-1000/index.html', title: 'Business Cards · ENESMA Shop', page: 'product', sku: 'cards-1000' },
   { out: 'cart/index.html', title: 'Your Bag · ENESMA Shop', page: 'cart' },
   { out: 'checkout/index.html', title: 'Checkout · ENESMA Shop', page: 'checkout' },

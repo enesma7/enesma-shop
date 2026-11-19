@@ -1,0 +1,12 @@
+{
+  "name": "enesma-shop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pages": "node scripts/write-pages.mjs",
+    "models": "node scripts/build-models.mjs",
+    "brand": "node scripts/prepare-brand.mjs",
+    "render": "node scripts/render-stills.mjs",
+    "test": "node scripts/price.test.mjs"
+  }
+}

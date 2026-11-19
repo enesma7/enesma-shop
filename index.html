@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ENESMA Shop</title>
+<script>
+(function () {
+  var path = location.pathname, marker = '/enesma-shop/', i = path.indexOf(marker);
+  window.SHOP_BASE = i >= 0 ? path.slice(0, i + marker.length) : '/';
+  document.write('<base href="' + window.SHOP_BASE + '">');
+})();
+</script>
+
+<link rel="stylesheet" href="css/shop.css">
+<link rel="icon" href="favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#fbfbfb">
+<meta name="description" content="ENESMA Shop. Gear, signs, and cards for ENESMA Realty.">
+</head>
+<body data-page="home">
+<div id="app"></div>
+<script src="js/config.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

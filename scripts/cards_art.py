@@ -69,31 +69,60 @@ def front(dark):
     return im
 
 
+def fit_width(draw, text, path, target, lo=12, hi=400):
+    best = font(path, lo)
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        face = font(path, mid)
+        if draw.textlength(text, font=face) <= target:
+            best = face
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
 def back(dark):
+    """Photo side. Headshot is about 1.16 in on a 2 in card, inside a 0.125 in safe margin."""
     bg = (16, 16, 18, 255) if dark else (251, 251, 251, 255)
     fg = (248, 248, 246, 255) if dark else (16, 16, 18, 255)
     muted = (176, 176, 180, 255) if dark else (70, 70, 74, 255)
     im = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(im)
-    photo = circle_head(300)
-    name_f = font(FONT_B, 92)
-    role_f = font(FONT_M, 36)
-    body_f = font(FONT_M, 58)
+    margin = int(round(0.125 / 3.5 * W))
+    photo_d = int(round(H * 0.58))
+    photo = circle_head(photo_d)
+    photo_x = margin
+    photo_y = (H - photo_d) // 2
+    im.alpha_composite(photo, (photo_x, photo_y))
+    mark = wordmark(dark, int(W * 0.20))
+    logo_x = W - margin - mark.width
+    logo_y = H - margin - mark.height
+    text_left = photo_x + photo_d + int(W * 0.04)
+    name_right = W - margin
+    body_right = logo_x - int(W * 0.025)
+    name_f = fit_width(d, "AGENT NAME", FONT_B, name_right - text_left)
+    role_f = font(FONT_M, max(18, int(name_f.size * 0.32)))
+    body_f = fit_width(d, "agent@email.com", FONT_M, body_right - text_left, hi=int(name_f.size * 0.48))
     lines = ["(000) 000-0000", "agent@email.com", "DRE# 00000000"]
-    block_h = 92 + 44 + 70 + 58 * 3 + 18 * 2
-    top = (H - max(photo.height, block_h)) // 2
-    im.alpha_composite(photo, (90, top + (max(photo.height, block_h) - photo.height) // 2))
-    x = 90 + photo.width + 56
-    y = top + (max(photo.height, block_h) - block_h) // 2
-    d.text((x, y), "AGENT NAME", font=name_f, fill=fg)
-    d.text((x, y + 108), "REALTOR®", font=role_f, fill=muted)
-    yy = y + 180
+    gap_n = int(name_f.size * 0.22)
+    gap_b = int(body_f.size * 0.38)
+
+    def draw_left(text, face, y, fill):
+        d.text((text_left, y), text, font=face, fill=fill)
+        return d.textbbox((text_left, y), text, font=face)[3]
+
+    probe = d.textbbox((0, 0), "AGENT NAME", font=name_f)
+    role_h = d.textbbox((0, 0), "REALTOR®", font=role_f)[3] - d.textbbox((0, 0), "REALTOR®", font=role_f)[1]
+    body_h = d.textbbox((0, 0), lines[0], font=body_f)[3] - d.textbbox((0, 0), lines[0], font=body_f)[1]
+    block_h = (probe[3] - probe[1]) + gap_n + role_h + int(name_f.size * 0.34) + 3 * body_h + 2 * gap_b
+    top = photo_y + max(0, (photo_d - block_h) // 2)
+    top = max(margin, min(top, logo_y - block_h - 10))
+    y = draw_left("AGENT NAME", name_f, top, fg) + gap_n
+    y = draw_left("REALTOR®", role_f, y, muted) + int(name_f.size * 0.34)
     for line in lines:
-        d.text((x, yy), line, font=body_f, fill=fg)
-        yy += 76
-    mark = wordmark(dark, 280)
-    margin = 64
-    im.alpha_composite(mark, (W - margin - mark.width, H - margin - mark.height))
+        y = draw_left(line, body_f, y, fg) + gap_b
+    im.alpha_composite(mark, (logo_x, logo_y))
     return im
 
 
@@ -157,6 +186,8 @@ def save(im, name):
 
 
 def main():
+    cards_dir = os.path.join(ROOT, "assets/cards")
+    os.makedirs(cards_dir, exist_ok=True)
     for dark, color in ((True, "black"), (False, "white")):
         face = front(dark)
         rear = back(dark)
@@ -164,7 +195,8 @@ def main():
         save(rear, f"cards-1000-{color}-back")
         pair = studio_pair(face, rear)
         save(pair, f"cards-1000-{color}-hero")
-        print("cards", color, pair.size)
+        pair.save(os.path.join(cards_dir, f"card-{color}.jpg"), quality=92, optimize=True)
+        print("cards", color, pair.size, "name", face.size)
 
 
 if __name__ == "__main__":

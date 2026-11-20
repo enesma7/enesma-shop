@@ -97,7 +97,7 @@
         category: 'signs',
         name: 'Open House Signs',
         detail: '12×18 · Bundle Of 15',
-        image: { w: 2400, h: 1600 },
+        image: { w: 1600, h: 2000 },
         blurb: 'A bundle of 15 open house signs, printed with your photo and contact details.',
         price: 134,
         sizes: false,

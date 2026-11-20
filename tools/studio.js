@@ -320,8 +320,7 @@ async function renderSign(job) {
   if (job.product === 'a-frame') {
     group.add(buildAFrame(job.color));
   } else if (job.product === 'open-house') {
-    // 18 in wide by 12 in tall, the catalog sheet's exact proportion.
-    group.add(openHouseBoard(0.4572, 0.3048, 0.005, job.color));
+    group.add(buildHStake(job.color));
   } else {
     const face = forSaleCanvas(job.color);
     const depth = job.product === 'aluminum' ? 0.0022 : 0.008;
@@ -343,6 +342,15 @@ async function renderSign(job) {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   frameObject(group, job.yaw == null ? 0.42 : job.yaw, job.fill || 0.86, job.lift);
+  if (job.product === 'open-house') {
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(6, 64),
+      new THREE.MeshStandardMaterial({ color: '#e7e4df', roughness: 1, metalness: 0 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    scene.add(floor);
+  }
   renderer.render(scene, camera);
   return renderer.domElement.toDataURL('image/png');
 }
@@ -368,6 +376,58 @@ function roundedRectMesh(width, height, tubeRadius, cornerRadius, material) {
   const mesh = new THREE.Mesh(geo, material);
   mesh.castShadow = true;
   return mesh;
+}
+
+function rod(from, to, radius, material) {
+  const dir = new THREE.Vector3().subVectors(to, from);
+  const len = Math.max(0.001, dir.length());
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 14), material);
+  mesh.position.copy(from).add(to).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function buildHStake(color) {
+  const group = new THREE.Group();
+  const galv = new THREE.MeshPhysicalMaterial({
+    color: '#8f9398',
+    metalness: 0.92,
+    roughness: 0.28,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.3
+  });
+  const signW = 0.4572;
+  const signH = 0.3048;
+  const wire = 0.0046;
+  const half = 0.162;
+  const top = 0.82;
+  const barTop = 0.74;
+  const barLow = 0.40;
+  [-half, half].forEach(function (x) {
+    group.add(rod(new THREE.Vector3(x, -0.025, 0), new THREE.Vector3(x, top, 0), wire, galv));
+  });
+  group.add(rod(new THREE.Vector3(-half, barTop, 0), new THREE.Vector3(half, barTop, 0), wire, galv));
+  group.add(rod(new THREE.Vector3(-half, barLow, 0), new THREE.Vector3(half, barLow, 0), wire, galv));
+  group.add(rod(new THREE.Vector3(half, 0.18, 0), new THREE.Vector3(half + 0.075, 0.18, 0.03), wire, galv));
+  const sign = openHouseBoard(signW, signH, 0.005, color);
+  sign.position.set(0, (barTop + barLow) / 2, 0.014);
+  group.add(sign);
+  const pile = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const mini = new THREE.Group();
+    const h = 0.072;
+    mini.add(rod(new THREE.Vector3(-h, 0, 0), new THREE.Vector3(-h, 0.30, 0), wire * 0.9, galv));
+    mini.add(rod(new THREE.Vector3(h, 0, 0), new THREE.Vector3(h, 0.30, 0), wire * 0.9, galv));
+    mini.add(rod(new THREE.Vector3(-h, 0.26, 0), new THREE.Vector3(h, 0.26, 0), wire * 0.9, galv));
+    mini.add(rod(new THREE.Vector3(-h, 0.07, 0), new THREE.Vector3(h, 0.07, 0), wire * 0.9, galv));
+    mini.rotation.y = -0.35 + i * 0.08;
+    mini.position.set(i * 0.02, 0, i * 0.018);
+    pile.add(mini);
+  }
+  pile.position.set(0.42, 0, 0.05);
+  group.add(pile);
+  return group;
 }
 
 function tubeAlong(points, radius, material) {

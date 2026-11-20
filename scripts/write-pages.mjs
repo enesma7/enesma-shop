@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+const asset = '20261120e';
 const pages = [
   { out: 'index.html', title: 'ENESMA Shop', page: 'home' },
   { out: 'gear/index.html', title: 'Gear · ENESMA Shop', page: 'closet', importMap: true },
@@ -42,24 +43,28 @@ document.write('<script type="importmap">'+JSON.stringify({imports:{"three":wind
 (function () {
   var path = location.pathname, marker = '/enesma-shop/', i = path.indexOf(marker);
   window.SHOP_BASE = i >= 0 ? path.slice(0, i + marker.length) : '/';
-  document.write('<base href="' + window.SHOP_BASE + '">');
+  var v = '${asset}';
+  var b = window.SHOP_BASE;
+  document.write('<base href="' + b + '">');
+  document.write('<link rel="stylesheet" href="' + b + 'css/shop.css?v=' + v + '">');
+  document.write('<link rel="icon" href="' + b + 'favicon-32.png" type="image/png">');
+  document.write('<link rel="apple-touch-icon" href="' + b + 'apple-touch-icon.png">');
 })();
 </script>
 ${map}
-<link rel="stylesheet" href="css/shop.css">
-<link rel="icon" href="favicon-32.png" type="image/png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#fbfbfb">
 <meta name="description" content="ENESMA Shop. Gear, signs, and cards for ENESMA Realty.">
 </head>
 <body ${attrs}>
 <div id="app"></div>
-<script src="js/config.js"></script>
-<script src="js/catalog.js"></script>
-<script src="js/cart.js"></script>
-<script src="js/api.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/main.js"></script>
+<script>
+document.write('<script src="' + window.SHOP_BASE + 'js/config.js?v=${asset}"><\\/script>');
+document.write('<script src="' + window.SHOP_BASE + 'js/catalog.js?v=${asset}"><\\/script>');
+document.write('<script src="' + window.SHOP_BASE + 'js/cart.js?v=${asset}"><\\/script>');
+document.write('<script src="' + window.SHOP_BASE + 'js/api.js?v=${asset}"><\\/script>');
+document.write('<script src="' + window.SHOP_BASE + 'js/ui.js?v=${asset}"><\\/script>');
+document.write('<script src="' + window.SHOP_BASE + 'js/main.js?v=${asset}"><\\/script>');
+</script>
 </body>
 </html>
 `;
@@ -78,7 +83,7 @@ fs.writeFileSync('404.html', `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Not Found · ENESMA Shop</title>
-<link rel="stylesheet" href="/css/shop.css">
+<link rel="stylesheet" href="/css/shop.css?v=${asset}">
 </head>
 <body>
 <main class="section"><h1>Page Not Found</h1><p><a href="/">Back To Shop</a></p></main>

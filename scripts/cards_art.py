@@ -127,7 +127,7 @@ def studio_pair(front_im, back_im):
     stage_w, stage_h = 2400, 1320
     stage = radial_stage(stage_w, stage_h).convert("RGBA")
     gap = 36
-    card_w = int((stage_w * 0.85 - gap) / 2)
+    card_w = int((stage_w * 0.90 - gap) / 2)
     sprites = []
     for im in (front_im, back_im):
         face = im.convert("RGBA").resize((card_w, int(card_w * im.height / im.width)), Image.Resampling.LANCZOS)

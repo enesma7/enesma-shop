@@ -21,7 +21,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; overflow-x: clip; }
 html { scroll-behavior: smooth; }
 body {
   min-height: 100vh;
@@ -68,9 +68,8 @@ h1, h2, h3, p { text-wrap: pretty; }
 .admin-link, .bag, .menu-btn, .text-btn {
   background: none; border: 0; cursor: pointer; text-decoration: none;
   min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
-  padding: 0 10px; font-size: 14px; font-weight: 500;
+  padding: 0 10px; font-size: 14px; font-weight: 500; color: var(--black); line-height: 1;
 }
-.admin-link { color: var(--muted); font-size: 13px; }
 .bag { gap: 6px; }
 .bag b {
   min-width: 18px; height: 18px; border-radius: 99px; background: var(--black); color: var(--white);
@@ -93,7 +92,7 @@ h1, h2, h3, p { text-wrap: pretty; }
   text-decoration: none; color: #fbfbfb;
 }
 .tile img {
-  width: 100%; height: 100%; object-fit: cover; object-position: 78% center;
+  width: 100%; height: 100%; object-fit: contain; object-position: center;
   position: absolute; inset: 0;
 }
 .tile::before {
@@ -125,9 +124,11 @@ h1, h2, h3, p { text-wrap: pretty; }
 .card h2 { font-size: 16px; font-weight: 500; margin: 10px 0 0; }
 .card p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 
-.product { display: grid; gap: 8px; }
-.gallery { background: #f4f3f0; }
-.gallery img { width: 100%; height: auto; object-fit: contain; }
+.product { display: grid; gap: 8px; width: 100%; grid-template-columns: minmax(0, 1fr); }
+.gallery, .buy { min-width: 0; max-width: 100%; }
+.gallery { background: #f4f3f0; overflow: hidden; }
+.gallery picture { display: block; max-width: 100%; }
+.gallery img { width: 100%; max-width: 100%; height: auto; object-fit: contain; }
 .buy { padding: 8px 16px 28px; max-width: 560px; }
 .buy h1 { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; margin: 12px 0 0; }
 .buy .detail { color: var(--muted); margin: 4px 0 0; }
@@ -203,7 +204,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .closet { position: relative; display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #dbd8d4; color: #141418; }
 .stage { position: relative; height: 70vh; min-height: 420px; background: #dbd8d4; }
 .closet-headline {
-  position: absolute; z-index: 2; left: 22px; top: 28px; max-width: 11ch;
+  position: absolute; z-index: 2; left: 22px; top: 36px; max-width: 11ch;
   margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.02;
   pointer-events: none;
 }
@@ -250,11 +251,11 @@ h1, h2, h3, p { text-wrap: pretty; }
   .nav { display: flex; }
   .hero-tiles { gap: 16px; padding: 20px 20px 40px; }
   .tile { aspect-ratio: 16/9; }
-  .tile img { object-position: center; }
+  .tile img { object-fit: cover; object-position: center; }
   .tile .copy { left: 36px; bottom: 32px; }
   .tile .copy b { font-size: 44px; }
   .grid { grid-template-columns: repeat(3, 1fr); gap: 28px 18px; }
-  .product { grid-template-columns: 1.3fr 0.8fr; align-items: start; gap: 28px; }
+  .product { grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr); align-items: start; gap: 28px; }
   .buy { position: sticky; top: 84px; padding-top: 24px; }
   .closet { flex-direction: row; }
   .stage { height: auto; flex: 1.4; min-height: calc(100vh - var(--header)); }
@@ -267,14 +268,14 @@ h1, h2, h3, p { text-wrap: pretty; }
   .closet { height: auto; min-height: 0; overflow: visible; background: #dbd8d4; }
   .closet-headline {
     position: relative; top: auto; left: auto; bottom: auto;
-    margin: 0; padding: 14px 16px 2px; max-width: none; font-size: 26px;
+    margin: 0; padding: 18px 16px 20px; max-width: none; font-size: 26px;
     background: #dbd8d4;
   }
   .stage { flex: none; height: auto; min-height: 0; background: #dbd8d4; }
   .closet.detail { flex-direction: column; }
-  .closet.detail .stage { height: 54vh; min-height: 320px; flex: none; }
+  .closet.detail .stage { width: 100%; height: 58vh; min-height: 320px; flex: none; }
   .closet.detail .sheet {
-    position: relative; inset: auto; width: 100%; height: auto; max-height: 46vh;
-    box-shadow: none;
+    position: relative; inset: auto; width: 100%; height: auto; max-height: none;
+    box-shadow: none; border-radius: 0; overflow: visible;
   }
 }

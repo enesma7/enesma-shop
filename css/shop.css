@@ -267,10 +267,10 @@ h1, h2, h3, p { text-wrap: pretty; }
   .closet { height: auto; min-height: 0; overflow: visible; background: #dbd8d4; }
   .closet-headline {
     position: relative; top: auto; left: auto; bottom: auto;
-    margin: 0; padding: 14px 16px 6px; max-width: none; font-size: 26px;
+    margin: 0; padding: 14px 16px 2px; max-width: none; font-size: 26px;
     background: #dbd8d4;
   }
-  .stage { flex: none; height: 60dvh; min-height: 0; background: #dbd8d4; }
+  .stage { flex: none; height: auto; min-height: 0; background: #dbd8d4; }
   .closet.detail { flex-direction: column; }
   .closet.detail .stage { height: 54vh; min-height: 320px; flex: none; }
   .closet.detail .sheet {

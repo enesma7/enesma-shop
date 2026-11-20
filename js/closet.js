@@ -9,7 +9,7 @@ const SPECS = [
   { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.006 },
   { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.006 },
   { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.006 },
-  { sku: 'cap', hang: 'cap', tall: 0.24, shelf: true, bulge: 0.018, thick: 0.014, angle: 0.28 }
+  { sku: 'cap', hang: 'cap', tall: 0.24, shelf: true, bulge: 0.018, thick: 0.014, angle: 0 }
 ];
 
 const RAIL_Y = 0.36;
@@ -335,16 +335,16 @@ function boot() {
     const g = new THREE.Group();
     const hookMat = gold.clone();
     const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0.075, 0),
-      new THREE.Vector3(0, 0.13, 0),
+      new THREE.Vector3(0, 0.12, 0),
+      new THREE.Vector3(0, 0.15, 0),
       new THREE.Vector3(0.012, 0.175, 0),
       new THREE.Vector3(0.046, 0.198, 0),
       new THREE.Vector3(0.07, 0.168, 0),
       new THREE.Vector3(0.05, 0.132, 0)
     ]);
     const hook = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.011, 16, false), hookMat);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.016, 12), hookMat);
-    neck.position.y = 0.082;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 12), hookMat);
+    neck.position.y = 0.135;
     g.add(hook, neck);
     g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
     g.scale.setScalar(1.35);
@@ -428,7 +428,7 @@ function boot() {
         rotator.rotation.y = spec.angle;
       }
     } else {
-      const neck = -0.19;
+      const neck = -0.01;
       shells.black.position.y = neck - shells.black.userData.top;
       shells.white.position.y = neck - shells.white.userData.top;
       holder.position.set(index * SPACING, RAIL_Y, 0);
@@ -528,34 +528,35 @@ function boot() {
     let lookY = 0.12;
     let camY = 0.38;
     if (phone && mode !== 'detail' && pieces[0]) {
-      let minX = Infinity;
-      let maxX = -Infinity;
+      let minX = rackCenter - railLen / 2 - 0.02;
+      let maxX = rackCenter + railLen / 2 + 0.02;
       let minY = Infinity;
-      let maxY = -Infinity;
+      let maxY = shelf.position.y + 0.28;
       pieces.forEach(function (p) {
         if (!p) return;
         p.holder.updateWorldMatrix(true, true);
         const box = new THREE.Box3().setFromObject(p.holder);
-        minX = Math.min(minX, box.min.x);
-        maxX = Math.max(maxX, box.max.x);
         minY = Math.min(minY, box.min.y);
         maxY = Math.max(maxY, box.max.y);
       });
-      maxY = Math.max(maxY, shelfY + 0.16);
-      const contentW = Math.max(0.4, maxX - minX);
+      const contentW = maxX - minX;
       const contentH = Math.max(0.4, maxY - minY);
-      const pad = 16 / Math.max(1, stage.clientWidth);
-      span = contentW / (1 - 2 * pad);
-      const zW = (span / Math.max(0.45, aspect)) / (2 * half);
-      const zH = (contentH * 1.08) / (2 * half);
-      const zFit = Math.max(zW, zH);
-      lookY = (minY + maxY) / 2;
-      camY = lookY;
-      camera.position.set((minX + maxX) / 2, camY, zFit);
+      const width = stage.clientWidth;
+      const padPx = 16;
+      const topPx = -16;
+      const botPx = 12;
+      span = contentW * width / Math.max(1, width - padPx * 2);
+      const cssH = Math.max(200, Math.round(contentH / span * width + topPx + botPx));
+      stage.style.height = cssH + 'px';
+      camera.aspect = width / cssH;
+      const zFit = (span / camera.aspect) / (2 * half);
+      const ndcTop = 1 - 2 * (topPx / cssH);
+      lookY = maxY - ndcTop * zFit * half;
+      camera.position.set((minX + maxX) / 2, lookY, zFit);
       camera.lookAt((minX + maxX) / 2, lookY, 0);
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(stage.clientWidth, stage.clientHeight);
+      renderer.setSize(width, cssH);
       return;
     }
     const z = Math.max(3.2, (span / Math.max(0.5, aspect)) / (2 * half));

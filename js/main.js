@@ -49,7 +49,7 @@
     UI.$('#content').appendChild(root);
     function draw() {
       var priced = Cat.priceOf(product, state);
-      var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : product.category === 'cards' ? ['hero', 'back'] : ['hero'];
+      var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : ['hero'];
       UI.$('#gallery').innerHTML = shots.map(function (view) {
         return picture(product.id, state.color, view, product.name + ' in ' + (state.color === 'white' ? 'White' : 'Black'));
       }).join('');

@@ -1,5 +1,6 @@
 """Flat business-card faces. No painted edge. Black and white share one layout."""
 import os
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = "/workspace"
@@ -96,9 +97,57 @@ def back(dark):
     return im
 
 
+def radial_stage(w, h):
+    """Dark studio sweep, lighter toward the top center."""
+    yy, xx = np.mgrid[0:h, 0:w]
+    nx = (xx - w * 0.5) / (w * 0.72)
+    ny = (yy - h * 0.38) / (h * 0.85)
+    t = np.clip(np.sqrt(nx * nx + ny * ny), 0, 1)
+    # #2a2a2e near the light, #0c0c0e at the edges
+    light = np.array([42, 42, 46], dtype=np.float32)
+    dark = np.array([10, 10, 12], dtype=np.float32)
+    rgb = light * (1 - t[..., None]) + dark * t[..., None]
+    return Image.fromarray(rgb.astype(np.uint8), "RGB")
+
+
+def card_sprite(face, thick=16):
+    """A 3.5×2 card with a thin stock edge and a soft drop shadow."""
+    face = face.convert("RGBA")
+    w, h = face.size
+    canvas = Image.new("RGBA", (w + thick + 80, h + thick + 90), (0, 0, 0, 0))
+    edge = Image.new("RGBA", (w, h), (22, 22, 24, 255))
+    for i in range(thick, 0, -1):
+        shade = 18 + int(28 * (i / thick))
+        edge = Image.new("RGBA", (w, h), (shade, shade, shade + 2, 255))
+        canvas.alpha_composite(edge, (40 + i, 24 + i))
+    canvas.alpha_composite(face, (40, 24))
+    return canvas
+
+
+def studio_pair(front_im, back_im):
+    stage = radial_stage(2400, 1500).convert("RGBA")
+    card_w = 980
+    sprites = []
+    for im in (front_im, back_im):
+        face = im.convert("RGBA").resize((card_w, int(card_w * im.height / im.width)), Image.Resampling.LANCZOS)
+        sprites.append(card_sprite(face, 18))
+    gap = 70
+    total = sprites[0].width + gap + sprites[1].width
+    x = (stage.width - total) // 2
+    y = (stage.height - sprites[0].height) // 2 + 10
+    for sprite, dx in ((sprites[0], 0), (sprites[1], sprites[0].width + gap)):
+        shadow = Image.new("RGBA", sprite.size, (0, 0, 0, 0))
+        alpha = sprite.split()[-1].filter(ImageFilter.GaussianBlur(22))
+        shade = Image.new("RGBA", sprite.size, (0, 0, 0, 150))
+        shade.putalpha(alpha)
+        shadow.alpha_composite(shade, (0, 0))
+        stage.alpha_composite(shadow, (x + dx + 10, y + 28))
+        stage.alpha_composite(sprite, (x + dx, y))
+    return stage.convert("RGB")
+
+
 def save(im, name):
-    rgb = Image.new("RGB", im.size, (255, 255, 255))
-    rgb.paste(im, mask=im.split()[-1])
+    rgb = im.convert("RGB")
     base = os.path.join(OUT, name)
     rgb.save(base + ".jpg", quality=92, optimize=True)
     rgb.save(base + ".webp", quality=86, method=4)
@@ -109,9 +158,9 @@ def save(im, name):
 
 def main():
     for dark, color in ((True, "black"), (False, "white")):
-        save(front(dark), f"cards-1000-{color}-hero")
-        save(back(dark), f"cards-1000-{color}-back")
-        print("cards", color)
+        pair = studio_pair(front(dark), back(dark))
+        save(pair, f"cards-1000-{color}-hero")
+        print("cards", color, pair.size)
 
 
 if __name__ == "__main__":

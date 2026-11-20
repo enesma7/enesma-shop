@@ -6,14 +6,15 @@ const Cat = window.ShopCatalog;
 const Cart = window.ShopCart;
 
 const SPECS = [
-  { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false },
-  { sku: 'polo', hang: 'polo', tall: 1.05, shelf: false },
-  { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false },
-  { sku: 'cap', hang: 'cap', tall: 0.32, shelf: true }
+  { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.02 },
+  { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.02 },
+  { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.02 },
+  { sku: 'cap', hang: 'cap', tall: 0.24, shelf: true, bulge: 0.018, thick: 0.014, angle: 0.28 }
 ];
 
-const RAIL_Y = 0.48;
-const SPACING = 0.92;
+const RAIL_Y = 0.36;
+const SPACING = 1.05;
+const WALL_Z = -0.46;
 
 function boot() {
   const stage = document.getElementById('stage');
@@ -21,56 +22,54 @@ function boot() {
   const pill = document.getElementById('pill');
   const headline = document.getElementById('closetHeadline');
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMappingExposure = 1.02;
+  renderer.shadowMap.enabled = false;
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#f6f3ee');
+  scene.background = new THREE.Color('#e6dfd4');
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.045).texture;
 
   const camera = new THREE.PerspectiveCamera(27, 1, 0.05, 40);
-  const rackCenter = SPACING * 1.5;
+  const rackCenter = SPACING;
 
-  scene.add(new THREE.AmbientLight('#fff6ee', 0.42));
-  const key = new THREE.DirectionalLight('#fff1e2', 2.15);
-  key.position.set(-1.6, 3.4, 2.6);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.near = 0.5;
-  key.shadow.camera.far = 12;
-  key.shadow.camera.left = -3;
-  key.shadow.camera.right = 3;
-  key.shadow.camera.top = 2;
-  key.shadow.camera.bottom = -2;
+  scene.add(new THREE.AmbientLight('#fff3e6', 0.78));
+  const key = new THREE.DirectionalLight('#fff4e4', 1.05);
+  key.position.set(-1.8, 3.6, 3.2);
   scene.add(key);
-  const fill = new THREE.DirectionalLight('#e7eef6', 0.45);
-  fill.position.set(2.2, 1.4, 1.8);
+  const fill = new THREE.DirectionalLight('#f6efe4', 0.38);
+  fill.position.set(2.4, 1.6, 2.4);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight('#f3e6cf', 0.35);
-  rim.position.set(0.2, 1.6, -2.4);
+  const rim = new THREE.DirectionalLight('#f4e2c4', 0.22);
+  rim.position.set(0.4, 2.4, -2.2);
   scene.add(rim);
 
   const wall = new THREE.Mesh(
-    new THREE.PlaneGeometry(14, 8),
-    new THREE.MeshStandardMaterial({ color: '#f6f3ee', roughness: 1 })
+    new THREE.PlaneGeometry(16, 9),
+    new THREE.MeshStandardMaterial({ color: '#e6dfd4', roughness: 0.96, metalness: 0 })
   );
-  wall.position.set(rackCenter, 0.1, -0.55);
-  wall.receiveShadow = true;
+  wall.position.set(rackCenter, 0.15, WALL_Z);
   scene.add(wall);
 
-  const railMat = new THREE.MeshStandardMaterial({ color: '#101014', metalness: 0.72, roughness: 0.28 });
-  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, SPACING * 3 + 1.4, 40), railMat);
+  const railMat = new THREE.MeshStandardMaterial({ color: '#101014', metalness: 0.78, roughness: 0.24 });
+  const railLen = SPACING * 2 + 1.25;
+  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, railLen, 40), railMat);
   rail.rotation.z = Math.PI / 2;
-  rail.position.set(rackCenter, RAIL_Y, 0);
-  rail.castShadow = true;
+  rail.position.set(rackCenter, RAIL_Y, 0.02);
   scene.add(rail);
+  [-1, 1].forEach(function (side) {
+    const x = rackCenter + side * (railLen / 2 - 0.04);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.02 - WALL_Z), railMat);
+    arm.position.set(x, RAIL_Y, (0.02 + WALL_Z) / 2);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.012), railMat);
+    plate.position.set(x, RAIL_Y, WALL_Z + 0.006);
+    scene.add(arm, plate);
+  });
 
   const velvet = new THREE.MeshStandardMaterial({ color: '#141416', roughness: 0.78, metalness: 0.04 });
   const gold = new THREE.MeshPhysicalMaterial({
@@ -81,7 +80,9 @@ function boot() {
     clearcoatRoughness: 0.18,
     envMapIntensity: 1.25
   });
-  const shelfMat = new THREE.MeshStandardMaterial({ color: '#121214', roughness: 0.42, metalness: 0.35 });
+  const shelfMat = new THREE.MeshPhysicalMaterial({
+    color: '#0c0c0e', metalness: 0.78, roughness: 0.22, clearcoat: 0.7, clearcoatRoughness: 0.16, envMapIntensity: 1.2
+  });
 
   function loadImage(url) {
     return new Promise(function (resolve, reject) {
@@ -91,43 +92,30 @@ function boot() {
       img.src = url;
     });
   }
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
   function makeTex(img) {
     const tex = new THREE.Texture(img);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
+    tex.anisotropy = maxAniso;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.premultiplyAlpha = true;
     tex.needsUpdate = true;
     return tex;
   }
 
-  function garmentMesh(frontImg, backImg, targetH, sideColor) {
-    const max = 110;
-    const sc = max / Math.max(frontImg.width, frontImg.height);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(8, Math.round(frontImg.width * sc));
-    canvas.height = Math.max(8, Math.round(frontImg.height * sc));
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(frontImg, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const src = imageData.data;
-    const iw0 = canvas.width;
-    const ih0 = canvas.height;
-    for (let pass = 0; pass < 3; pass++) {
-      const mark = [];
-      for (let y = 1; y < ih0 - 1; y++) {
-        for (let x = 1; x < iw0 - 1; x++) {
-          const o = (y * iw0 + x) * 4;
-          if (src[o + 3] < 24) continue;
-          if (src[o] < 175 || src[o + 1] < 175 || src[o + 2] < 175) continue;
-          const near = [o - 4, o + 4, o - iw0 * 4, o + iw0 * 4].some(function (n) { return src[n + 3] < 24; });
-          if (near) mark.push(o);
-        }
-      }
-      mark.forEach(function (o) { src[o + 3] = 0; });
-    }
-    ctx.putImageData(imageData, 0, 0);
-    const data = src;
-    const iw = canvas.width;
-    const ih = canvas.height;
+  function garmentMesh(frontImg, backImg, spec) {
+    const maxMask = 480;
+    const sc = maxMask / Math.max(frontImg.width, frontImg.height);
+    const iw = Math.max(8, Math.round(frontImg.width * sc));
+    const ih = Math.max(8, Math.round(frontImg.height * sc));
+    const mask = document.createElement('canvas');
+    mask.width = iw;
+    mask.height = ih;
+    const mctx = mask.getContext('2d', { willReadFrequently: true });
+    mctx.drawImage(frontImg, 0, 0, iw, ih);
+    const data = mctx.getImageData(0, 0, iw, ih).data;
     const step = 2;
     const samples = [];
     let minY = ih;
@@ -136,55 +124,122 @@ function boot() {
       let left = -1;
       let right = -1;
       for (let x = 0; x < iw; x++) {
-        if (data[(y * iw + x) * 4 + 3] > 36) {
+        if (data[(y * iw + x) * 4 + 3] > 140) {
           if (left < 0) left = x;
           right = x;
         }
       }
-      if (left >= 0 && right - left > 2) {
+      if (left >= 0 && right - left > 3) {
         samples.push({ y: y, l: left, r: right });
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       }
     }
+    for (let i = 1; i < samples.length - 1; i++) {
+      samples[i].l = (samples[i - 1].l + samples[i].l * 2 + samples[i + 1].l) / 4;
+      samples[i].r = (samples[i - 1].r + samples[i].r * 2 + samples[i + 1].r) / 4;
+    }
     const opaque = Math.max(1, maxY - minY);
-    const worldH = targetH * (ih / opaque);
+    const worldH = spec.tall * (ih / opaque);
     const worldW = worldH * (frontImg.width / frontImg.height);
-    const thick = Math.max(0.02, targetH * 0.034);
-    const bulge = targetH * 0.028;
-    const cols = 20;
+    const thick = spec.thick;
+    const bulge = spec.bulge;
+    const cols = 36;
     const frontPos = [];
     const frontUv = [];
     const frontIdx = [];
     const backPos = [];
     const backUv = [];
     const backIdx = [];
-    const sidePos = [];
-    const sideIdx = [];
+    const edgePos = [];
+    const edgeCol = [];
+    const edgeIdx = [];
+    function sampleColor(px, py) {
+      const x = Math.max(0, Math.min(iw - 1, px | 0));
+      const y = Math.max(0, Math.min(ih - 1, py | 0));
+      const o = (y * iw + x) * 4;
+      if (data[o + 3] < 40) return spec.shelf ? [0.16, 0.16, 0.17] : [0.12, 0.12, 0.13];
+      return [data[o] / 255, data[o + 1] / 255, data[o + 2] / 255];
+    }
     const rows = samples.map(function (s) {
       const front = [];
       const back = [];
+      const vNorm = (s.y - minY) / opaque;
       for (let i = 0; i <= cols; i++) {
         const t = i / cols;
-        const px = s.l + (s.r - s.l) * t;
+        const inset = Math.min(4, (s.r - s.l) * 0.03);
+        const px = (s.l + inset) + (s.r - s.l - inset * 2) * t;
         const u = px / iw;
         const v = 1 - (s.y + 0.5) / ih;
         const x = (u - 0.5) * worldW;
         const yy = (0.5 - (s.y + 0.5) / ih) * worldH;
-        const lift = bulge * Math.sin(Math.PI * t) * Math.sin(Math.PI * (s.y - minY) / opaque);
+        const lift = bulge * Math.sin(Math.PI * t) * Math.sin(Math.PI * Math.min(1, Math.max(0, vNorm)));
+        const zf = lift + thick * 0.5;
+        const zb = lift - thick * 0.5;
         front.push(frontPos.length / 3);
-        frontPos.push(x, yy, thick * 0.5 + lift);
+        frontPos.push(x, yy, zf);
         frontUv.push(u, v);
         back.push(backPos.length / 3);
-        backPos.push(x, yy, -thick * 0.5 - lift * 0.4);
+        backPos.push(x, yy, zb);
         backUv.push(u, v);
       }
-      return { front: front, back: back };
+      return { front: front, back: back, y: s.y, l: s.l, r: s.r };
     });
-    function sideQuad(a, b, c, d) {
-      const base = sidePos.length / 3;
-      [a, b, c, d].forEach(function (p) { sidePos.push(p.x, p.y, p.z); });
-      sideIdx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    function pointAt(row, index) {
+      const fi = row.front[index];
+      const bi = row.back[index];
+      return {
+        x: frontPos[fi * 3],
+        y: frontPos[fi * 3 + 1],
+        zf: frontPos[fi * 3 + 2],
+        zb: backPos[bi * 3 + 2]
+      };
+    }
+    function toLinear(c) {
+      return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+    function clothAt(row) {
+      let dark = [0.1, 0.1, 0.1];
+      let darkLum = 99;
+      let light = [0.9, 0.9, 0.9];
+      let lightLum = -1;
+      let sum = 0;
+      let n = 0;
+      for (let t = 0.15; t <= 0.85; t += 0.1) {
+        const c = sampleColor(row.l + (row.r - row.l) * t, row.y);
+        const lum = c[0] + c[1] + c[2];
+        sum += lum;
+        n += 1;
+        if (lum < darkLum) { darkLum = lum; dark = c; }
+        if (lum > lightLum) { lightLum = lum; light = c; }
+      }
+      return sum / Math.max(1, n) < 1.5 ? dark : light;
+    }
+    function addLip(a, b, outward, color) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      if (Math.hypot(dx, dy) < 0.0008 || Math.hypot(dx, dy) > 0.05) return;
+      if (Math.abs(dx) > Math.abs(dy) * 0.35) return;
+      const segs = 4;
+      const rings = [[], []];
+      [a, b].forEach(function (p, pi) {
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs;
+          const ang = Math.PI * t;
+          const mid = (p.zf + p.zb) / 2;
+          const half = (p.zf - p.zb) / 2;
+          rings[pi].push(edgePos.length / 3);
+          edgePos.push(p.x, p.y, mid + Math.cos(ang) * half);
+          edgeCol.push(toLinear(color[0]), toLinear(color[1]), toLinear(color[2]));
+        }
+      });
+      for (let s = 0; s < segs; s++) {
+        const a0 = rings[0][s];
+        const a1 = rings[0][s + 1];
+        const b0 = rings[1][s];
+        const b1 = rings[1][s + 1];
+        edgeIdx.push(a0, b0, a1, a1, b0, b1);
+      }
     }
     for (let r = 0; r < rows.length - 1; r++) {
       const a = rows[r];
@@ -193,52 +248,47 @@ function boot() {
         frontIdx.push(a.front[i], b.front[i], a.front[i + 1], a.front[i + 1], b.front[i], b.front[i + 1]);
         backIdx.push(a.back[i], a.back[i + 1], b.back[i], a.back[i + 1], b.back[i + 1], b.back[i]);
       }
-      const edge = function (index) {
-        return {
-          x: frontPos[a.front[index] * 3],
-          y: frontPos[a.front[index] * 3 + 1],
-          zf: frontPos[a.front[index] * 3 + 2],
-          zb: backPos[a.back[index] * 3 + 2],
-          y2: frontPos[b.front[index] * 3 + 1],
-          x2: frontPos[b.front[index] * 3],
-          zf2: frontPos[b.front[index] * 3 + 2],
-          zb2: backPos[b.back[index] * 3 + 2]
-        };
-      };
-      [0, cols].forEach(function (index) {
-        const e = edge(index);
-        if (Math.abs(e.x - e.x2) > Math.abs(e.y - e.y2) * 0.45) return;
-        sideQuad(
-          { x: e.x, y: e.y, z: e.zf },
-          { x: e.x, y: e.y, z: e.zb },
-          { x: e.x2, y: e.y2, z: e.zf2 },
-          { x: e.x2, y: e.y2, z: e.zb2 }
-        );
-      });
+      const cloth = clothAt(a);
+      addLip(pointAt(a, 0), pointAt(b, 0), -1, cloth);
+      addLip(pointAt(a, cols), pointAt(b, cols), 1, cloth);
     }
-    function geo(pos, uv, idx) {
+    function geo(pos, uv, idx, colors) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      g.setIndex(idx);
+      if (colors) g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      if (idx.length) g.setIndex(idx);
       g.computeVertexNormals();
       return g;
     }
     const frontMat = new THREE.MeshBasicMaterial({
-      map: makeTex(canvas), alphaTest: 0.35, side: THREE.FrontSide
+      map: makeTex(frontImg),
+      alphaTest: 0.5,
+      premultipliedAlpha: true,
+      side: THREE.FrontSide
     });
     const backMat = new THREE.MeshBasicMaterial({
-      map: makeTex(backImg), alphaTest: 0.55, side: THREE.FrontSide
+      map: makeTex(backImg),
+      alphaTest: 0.5,
+      premultipliedAlpha: true,
+      side: THREE.FrontSide
     });
-    const sideMat = new THREE.MeshStandardMaterial({ color: sideColor, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    frontMat.toneMapped = false;
+    backMat.toneMapped = false;
+    const edgeMat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    });
     const group = new THREE.Group();
-    [new THREE.Mesh(geo(frontPos, frontUv, frontIdx), frontMat), new THREE.Mesh(geo(backPos, backUv, backIdx), backMat), new THREE.Mesh(geo(sidePos, null, sideIdx), sideMat)].forEach(function (mesh) {
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+    const frontMesh = new THREE.Mesh(geo(frontPos, frontUv, frontIdx), frontMat);
+    const backMesh = new THREE.Mesh(geo(backPos, backUv, backIdx), backMat);
+    const edgeMesh = new THREE.Mesh(geo(edgePos, null, edgeIdx, edgeCol), edgeMat);
+    [frontMesh, backMesh, edgeMesh].forEach(function (mesh) {
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       group.add(mesh);
     });
-    group.userData.frontMat = frontMat;
-    group.userData.backMat = backMat;
     const box = new THREE.Box3().setFromObject(group);
     group.userData.top = box.max.y;
     group.userData.bottom = box.min.y;
@@ -280,14 +330,54 @@ function boot() {
     return g;
   }
 
-  const pieces = [];
-  const capX = 3 * SPACING;
+  function softShadow(w, h) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(128, 132, 16, 128, 140, 122);
+    grd.addColorStop(0, 'rgba(40,32,24,0.14)');
+    grd.addColorStop(0.6, 'rgba(40,32,24,0.04)');
+    grd.addColorStop(1, 'rgba(40,32,24,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 256, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false })
+    );
+    return mesh;
+  }
 
-  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.016, 0.34), shelfMat);
-  shelf.position.set(capX, RAIL_Y + 0.34, 0.04);
-  shelf.castShadow = true;
-  shelf.receiveShadow = true;
+  const pieces = [];
+  const shelfW = SPACING * 2 + 0.55;
+  const shelfD = 0.2;
+  const shelfT = 0.012;
+  const shelfY = RAIL_Y + 0.52;
+  const shelfZ = WALL_Z + shelfD / 2 + 0.012;
+  const shelf = new THREE.Mesh(new THREE.BoxGeometry(shelfW, shelfT, shelfD), shelfMat);
+  shelf.position.set(rackCenter, shelfY, shelfZ);
   scene.add(shelf);
+  const shelfLip = new THREE.Mesh(
+    new THREE.BoxGeometry(shelfW - 0.02, 0.003, shelfD - 0.02),
+    new THREE.MeshStandardMaterial({ color: '#2a2926', metalness: 0.9, roughness: 0.16 })
+  );
+  shelfLip.position.set(rackCenter, shelfY + shelfT / 2, shelfZ);
+  scene.add(shelfLip);
+  [-0.34, 0.34].forEach(function (t) {
+    const x = rackCenter + t * shelfW;
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.05, shelfD * 0.78), shelfMat);
+    bracket.position.set(x, shelfY - 0.03, shelfZ + 0.02);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.01), shelfMat);
+    plate.position.set(x, shelfY - 0.01, WALL_Z + 0.006);
+    scene.add(bracket, plate);
+  });
+  const shelfShade = softShadow(shelfW * 1.05, shelfD * 0.7);
+  shelfShade.rotation.x = -Math.PI / 2;
+  shelfShade.position.set(rackCenter, shelfY - shelfT / 2 - 0.004, shelfZ + 0.02);
+  scene.add(shelfShade);
+  const capX = rackCenter + shelfW * 0.28;
 
   Promise.all(SPECS.map(async function (spec, index) {
     const colors = {};
@@ -298,10 +388,9 @@ function boot() {
         back: await loadImage(base + '-back.png')
       };
     }
-    const side = { black: '#101014', white: '#e6e3de' };
     const shells = {
-      black: garmentMesh(colors.black.front, colors.black.back, spec.tall, side.black),
-      white: garmentMesh(colors.white.front, colors.white.back, spec.tall, side.white)
+      black: garmentMesh(colors.black.front, colors.black.back, spec),
+      white: garmentMesh(colors.white.front, colors.white.back, spec)
     };
     shells.white.visible = false;
     const rotator = new THREE.Group();
@@ -309,10 +398,13 @@ function boot() {
     if (!spec.shelf) rotator.add(makeHanger());
     const holder = new THREE.Group();
     if (spec.shelf) {
-      const drop = -shells.black.userData.bottom + 0.012;
+      const drop = -shells.black.userData.bottom - 0.012;
       shells.black.position.y = drop;
-      shells.white.position.y = drop;
-      holder.position.set(capX, shelf.position.y + 0.008, 0.04);
+      shells.white.position.y = -shells.white.userData.bottom - 0.012;
+      holder.position.set(capX, shelfY + shelfT / 2 + 0.001, shelfZ + shelfD * 0.12);
+      if (spec.angle) {
+        rotator.rotation.y = spec.angle;
+      }
     } else {
       const neck = -0.1;
       shells.black.position.y = neck - shells.black.userData.top;
@@ -332,9 +424,15 @@ function boot() {
       y: holder.position.y,
       scale: 1,
       opacity: 1,
-      angle: 0,
+      angle: spec.angle || 0,
       spin: 0
     };
+    if (spec.shelf) {
+      const shade = softShadow(0.22, 0.1);
+      shade.rotation.x = -Math.PI / 2;
+      shade.position.set(0, 0.001, 0.01);
+      holder.add(shade);
+    }
   })).then(start).catch(function () {
     sheet.hidden = false;
     sheet.innerHTML = '<h2>Gear</h2><p class="hint">The closet photos could not be loaded.</p>';
@@ -403,11 +501,12 @@ function boot() {
     const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
     camera.aspect = aspect;
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
-    const span = mode === 'detail' && aspect < 1 ? 1.8 : SPACING * 3 + 1.5;
-    const z = Math.max(3.4, (span / Math.max(0.5, aspect)) / (2 * half));
-    camera.position.set(rackCenter, 0.22, z);
-    camera.lookAt(rackCenter, 0.12, 0);
+    const span = mode === 'detail' && aspect < 1 ? 1.7 : SPACING * 2 + 1.85;
+    const z = Math.max(3.2, (span / Math.max(0.5, aspect)) / (2 * half));
+    camera.position.set(rackCenter, 0.42, z);
+    camera.lookAt(rackCenter, 0.16, 0);
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(stage.clientWidth, stage.clientHeight);
   }
 

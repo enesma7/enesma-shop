@@ -21,6 +21,43 @@ WORD_B = Image.open(os.path.join(ROOT, "assets/logo/wordmark-black.png")).conver
 EMB_W = Image.open(os.path.join(ROOT, "assets/logo/emblem-white.png")).convert("RGBA")
 EMB_B = Image.open(os.path.join(ROOT, "assets/logo/emblem-black.png")).convert("RGBA")
 FONT = "/usr/share/fonts/truetype/macos/Inter-SemiBold.ttf"
+LONG = 2400
+
+
+def hi(im):
+    """Keep decoration on a photo at least 2400px on the long side."""
+    w, h = im.size
+    m = max(w, h)
+    if m >= LONG:
+        return im
+    scale = LONG / m
+    return im.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.Resampling.LANCZOS)
+
+
+def defringe(im, dark):
+    """Drop the light or partial pixels that sit on a cutout edge."""
+    arr = np.array(im)
+    alpha = arr[:, :, 3].copy()
+    lum = arr[:, :, :3].astype(np.int16).mean(axis=2)
+    for _ in range(3):
+        clear = alpha < 28
+        up = np.zeros_like(clear)
+        down = np.zeros_like(clear)
+        left = np.zeros_like(clear)
+        right = np.zeros_like(clear)
+        up[1:] = clear[:-1]
+        down[:-1] = clear[1:]
+        left[:, 1:] = clear[:, :-1]
+        right[:, :-1] = clear[:, 1:]
+        edge = (alpha >= 28) & (up | down | left | right)
+        if dark:
+            kill = edge & ((lum > 145) | (alpha < 200))
+        else:
+            kill = edge & (alpha < 210)
+        alpha[kill] = 0
+    arr[:, :, 3] = alpha
+    padded = np.pad(arr, ((2, 2), (2, 2), (0, 0)), mode="constant")
+    return Image.fromarray(padded)
 
 
 def bbox(im, thresh=236):
@@ -91,11 +128,12 @@ def studio(cut, size=(1600, 2000)):
 
 
 def save_pair(cut, slug, color, view):
-    # transparent source for the closet
+    # transparent source for the closet, full resolution, hard alpha edge
+    cut = defringe(cut, color == "black")
     cut.save(os.path.join(OUT, f"{slug}-{color}-{view}.png"))
     shot = studio(cut, (1600, 2000))
     base = os.path.join(RENDERS, f"{slug}-{color}-{view}")
-    shot.save(base + ".jpg", quality=86, optimize=True)
+    shot.save(base + ".jpg", quality=92, optimize=True)
     shot.save(base + ".webp", quality=82, method=4)
     thumb = shot.copy()
     thumb.thumbnail((720, 720))
@@ -103,8 +141,8 @@ def save_pair(cut, slug, color, view):
 
 
 def decorate_tee(color):
-    front = Image.open(f"{REF}/tee-{color}-3.jpg").convert("RGBA")
-    back = Image.open(f"{REF}/tee-{color}-4.jpg").convert("RGBA")
+    front = hi(Image.open(f"{REF}/tee-{color}-3.jpg").convert("RGBA"))
+    back = hi(Image.open(f"{REF}/tee-{color}-4.jpg").convert("RGBA"))
     word = WORD_W if color == "black" else WORD_B
     box = bbox(front)
     x0, y0, x1, y1 = box
@@ -157,8 +195,8 @@ def tonal_emblem(color):
 
 
 def decorate_polo(color):
-    im = Image.open(POLO_FRONT[color]).convert("RGBA")
-    back = Image.open(POLO_BACK[color]).convert("RGBA")
+    im = hi(Image.open(POLO_FRONT[color]).convert("RGBA"))
+    back = hi(Image.open(POLO_BACK[color]).convert("RGBA"))
     word = WORD_W if color == "black" else WORD_B
     box = bbox(im)
     x0, y0, x1, y1 = box
@@ -177,8 +215,8 @@ def decorate_polo(color):
 
 
 def decorate_qzip(color):
-    front = Image.open(f"{REF}/qzip-{color}-3.jpg").convert("RGBA")
-    back = Image.open(f"{REF}/qzip-{color}-4.jpg").convert("RGBA")
+    front = hi(Image.open(f"{REF}/qzip-{color}-3.jpg").convert("RGBA"))
+    back = hi(Image.open(f"{REF}/qzip-{color}-4.jpg").convert("RGBA"))
     word = WORD_W if color == "black" else WORD_B
     box = bbox(front)
     x0, y0, x1, y1 = box
@@ -192,18 +230,20 @@ def decorate_qzip(color):
 
 
 def decorate_cap(color):
-    front = Image.open(f"{REF}/cap-{color}-0.jpg").convert("RGBA")
-    back = Image.open(f"{REF}/cap-{color}-2.jpg").convert("RGBA")
+    # Brim to the right, so the wearer's left side panel is the panel facing us.
+    front = hi(Image.open(f"{REF}/cap-{color}-3.jpg").convert("RGBA"))
+    back = hi(Image.open(f"{REF}/cap-{color}-2.jpg").convert("RGBA"))
     word = WORD_W if color == "black" else WORD_B
     box = bbox(front)
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
-    # Front panels of the three-quarter photo sit left of center.
-    paste_center(front, word, x0 + bw * 0.36, y0 + bh * 0.36, bw * 0.24)
+    # Small logo centered on the two front panels, clear of the side seam.
+    paste_center(front, word, x0 + bw * 0.58, y0 + bh * 0.36, bw * 0.145)
     fill = (247, 247, 245, 255) if color == "black" else (20, 20, 22, 255)
-    mark = name_mark("AGENT NAME", fill, bw * 0.13)
-    mark = mark.rotate(-8, expand=True, resample=Image.Resampling.BICUBIC)
-    front.alpha_composite(mark, (int(x0 + bw * 0.68), int(y0 + bh * 0.34)))
+    mark = name_mark("AGENT NAME", fill, bw * 0.11)
+    mark = mark.rotate(11, expand=True, resample=Image.Resampling.BICUBIC)
+    # Left side panel, above the ear, behind the front panels.
+    paste_center(front, mark, x0 + bw * 0.24, y0 + bh * 0.40, mark.width)
     save_pair(cut_white(front), "cap", color, "front")
     save_pair(cut_white(front), "cap", color, "hero")
     save_pair(cap_emblem(cut_white(back), color), "cap", color, "back")

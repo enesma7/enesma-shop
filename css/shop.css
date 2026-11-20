@@ -200,8 +200,8 @@ h1, h2, h3, p { text-wrap: pretty; }
 
 .hp { position: absolute; left: -9999px; height: 0; overflow: hidden; }
 
-.closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #f4f2ee; color: #141418; }
-.stage { position: relative; height: 70vh; min-height: 420px; background: #f4f2ee; }
+.closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #e6dfd4; color: #141418; }
+.stage { position: relative; height: 70vh; min-height: 420px; background: #e6dfd4; }
 .closet-headline {
   position: absolute; z-index: 2; left: 22px; top: 28px; max-width: 11ch;
   margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.02;

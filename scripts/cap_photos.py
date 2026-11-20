@@ -94,6 +94,28 @@ def paste(base, mark, xy):
     base.alpha_composite(mark, (int(xy[0]), int(xy[1])))
 
 
+def foreshorten(mark, squeeze=0.72, near="right"):
+    """Compress one side of a mark so it sits on a turned panel without tearing the letters."""
+    arr = np.array(mark.convert("RGBA"))
+    h, w = arr.shape[:2]
+    out = np.zeros_like(arr)
+    for x in range(w):
+        t = x / max(1, w - 1)
+        scale = (1 - (1 - squeeze) * t) if near == "left" else (squeeze + (1 - squeeze) * t)
+        new_h = max(1, int(round(h * scale)))
+        ys = np.linspace(0, h - 1, new_h)
+        col = arr[np.clip(ys.astype(np.int32), 0, h - 1), x]
+        y0 = (h - new_h) // 2
+        out[y0:y0 + new_h, x] = col
+    return Image.fromarray(out, "RGBA")
+
+
+def front_mark(word, width, arch=0.16):
+    ratio = word.height / word.width
+    sized = word.resize((width, max(1, int(width * ratio))), Image.Resampling.LANCZOS)
+    return embroider(curve_logo(sized, arch))
+
+
 def decorate(im, white):
     """Return four views: front, side, back, three-quarter. `im` is unused; views are loaded."""
     return im
@@ -110,27 +132,28 @@ def build(color_white):
             im = recolor_white(im)
         w, h = im.size
         if key == "front":
-            lw = int(w * 0.58)
-            ratio = word.height / word.width
-            mark = embroider(curve_logo(word.resize((lw, max(1, int(lw * ratio))), Image.Resampling.LANCZOS), 0.20))
-            mw, mh = mark.size
-            x = (w - mw) // 2
-            y = int(h * 0.46) - mh // 2
-            paste(im, mark, (x, y))
+            mark = front_mark(word, int(w * 0.58), 0.20)
+            paste(im, mark, ((w - mark.width) // 2, int(h * 0.46) - mark.height // 2))
         elif key == "side":
-            label = tracked("AGENT NAME", max(28, int(h * 0.055)), ink)
-            label = label.rotate(16, expand=True, resample=Image.Resampling.BICUBIC)
-            label = embroider(label)
-            x = int(w * 0.30)
-            y = int(h * 0.50)
-            paste(im, label, (x, y))
+            # Wearer's left 3/4, bill to the right. The front panels are the right
+            # portion of the crown, turned away, so the mark is foreshortened.
+            mark = foreshorten(front_mark(word, int(w * 0.30), 0.10), 0.82, near="right")
+            mark = mark.rotate(8, expand=True, resample=Image.Resampling.BICUBIC)
+            paste(im, mark, (int(w * 0.46), int(h * 0.30)))
+            label = embroider(tracked("AGENT NAME", max(22, int(h * 0.032)), ink))
+            label = label.rotate(-3, expand=True, resample=Image.Resampling.BICUBIC)
+            paste(im, label, (int(w * 0.08), int(h * 0.66)))
+        elif key == "three":
+            # The other 3/4, bill to the left. Front panels face the camera more.
+            mark = foreshorten(front_mark(word, int(w * 0.42), 0.12), 0.84, near="left")
+            mark = mark.rotate(-6, expand=True, resample=Image.Resampling.BICUBIC)
+            paste(im, mark, (int(w * 0.22), int(h * 0.28)))
         elif key == "back":
-            ew = int(w * 0.11)
-            eh = int(ew * emblem.height / emblem.width)
+            # Center seam just above the strap opening on the real rear photo.
+            ew = int(w * 0.068)
+            eh = int(ew * emblem.height / max(1, emblem.width))
             mark = embroider(emblem.resize((ew, eh), Image.Resampling.LANCZOS))
-            x = int(w * 0.40) - mark.width // 2
-            y = int(h * 0.22)
-            paste(im, mark, (x, y))
+            paste(im, mark, (int(w * 0.25) - mark.width // 2, int(h * 0.58) - mark.height // 2))
         views[key] = im
     return views
 

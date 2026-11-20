@@ -754,15 +754,12 @@ function boot() {
             const on = piece.shells[key].visible;
             const n = views.length;
             const u = (yaw / tau) * n;
-            const i = Math.floor(u) % n;
-            const f = u - Math.floor(u);
+            const i = Math.round(u) % n;
             views.forEach(function (mesh, k) {
               mesh.rotation.y = -piece.rotator.rotation.y;
-              let o = 0;
-              if (on && k === i) o = 1 - f;
-              else if (on && k === (i + 1) % n) o = f;
-              mesh.material.opacity = o;
-              mesh.visible = o > 0.02;
+              const show = on && k === i;
+              mesh.material.opacity = show ? 1 : 0;
+              mesh.visible = show;
             });
           });
         }

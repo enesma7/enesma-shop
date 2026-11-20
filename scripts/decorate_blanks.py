@@ -264,8 +264,8 @@ def with_emblem(im, color):
     width = max(8, int(bw * 0.105))
     height = max(1, int(width * mark.height / mark.width))
     cx = (x0 + x1) / 2
-    # About 2 to 3 inches under the neckline seam, still small.
-    cy = y0 + bh * 0.13
+    # About 2 to 3 inches under the neckline seam, clear of the hook.
+    cy = y0 + bh * 0.16
     paste_center(im, mark, cx, cy, width)
     return im
 

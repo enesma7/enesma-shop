@@ -31,7 +31,7 @@ function boot() {
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#e6dfd4');
+  scene.background = new THREE.Color('#dbd8d4');
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.045).texture;
 
@@ -51,7 +51,7 @@ function boot() {
 
   const wall = new THREE.Mesh(
     new THREE.PlaneGeometry(16, 9),
-    new THREE.MeshStandardMaterial({ color: '#e6dfd4', roughness: 0.96, metalness: 0 })
+    new THREE.MeshBasicMaterial({ color: '#dbd8d4', toneMapped: false })
   );
   wall.position.set(rackCenter, 0.15, WALL_Z);
   scene.add(wall);
@@ -149,6 +149,16 @@ function boot() {
         samples[i].r = Math.max(next.r - jump, Math.min(next.r + jump, samples[i].r));
       }
     }
+    let centerSum = 0;
+    samples.forEach(function (s) { centerSum += (s.l + s.r) / 2; });
+    const center = centerSum / Math.max(1, samples.length);
+    samples.forEach(function (s) {
+      const half = (s.r - s.l) / 2;
+      s.ol = s.l;
+      s.or = s.r;
+      s.l = center - half;
+      s.r = center + half;
+    });
     const opaque = Math.max(1, maxY - minY);
     const worldH = spec.tall * (ih / opaque);
     const worldW = worldH * (frontImg.width / frontImg.height);
@@ -178,10 +188,13 @@ function boot() {
       for (let i = 0; i <= cols; i++) {
         const t = i / cols;
         const inset = Math.min(3, (s.r - s.l) * 0.02);
+        const ol = s.ol == null ? s.l : s.ol;
+        const orr = s.or == null ? s.r : s.or;
         const px = (s.l + inset) + (s.r - s.l - inset * 2) * t;
-        const u = px / iw;
+        const pxUv = (ol + inset) + (orr - ol - inset * 2) * t;
+        const u = pxUv / iw;
         const v = 1 - (s.y + 0.5) / ih;
-        const x = (u - 0.5) * worldW;
+        const x = (px / iw - 0.5) * worldW;
         const yy = (0.5 - (s.y + 0.5) / ih) * worldH;
         const lift = bulge * Math.sin(Math.PI * t) * Math.sin(Math.PI * Math.min(1, Math.max(0, vNorm)));
         const zf = lift + thick * 0.5;
@@ -330,8 +343,8 @@ function boot() {
       new THREE.Vector3(0.05, 0.132, 0)
     ]);
     const hook = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.011, 16, false), hookMat);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 12), hookMat);
-    neck.position.y = 0.05;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.016, 12), hookMat);
+    neck.position.y = 0.082;
     g.add(hook, neck);
     g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
     g.scale.setScalar(1.35);
@@ -415,7 +428,7 @@ function boot() {
         rotator.rotation.y = spec.angle;
       }
     } else {
-      const neck = -0.1;
+      const neck = -0.19;
       shells.black.position.y = neck - shells.black.userData.top;
       shells.white.position.y = neck - shells.white.userData.top;
       holder.position.set(index * SPACING, RAIL_Y, 0);
@@ -510,17 +523,42 @@ function boot() {
     const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
     camera.aspect = aspect;
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
-    const phone = aspect < 0.95;
-    const span = mode === 'detail' && phone ? 1.45 : phone ? SPACING * 2 + 0.95 : SPACING * 2 + 1.85;
-    const z = Math.max(phone ? 2.4 : 3.2, (span / Math.max(0.45, aspect)) / (2 * half));
-    let lookY = 0.16;
-    let camY = 0.42;
-    if (phone && mode !== 'detail') {
-      const halfH = z * half;
-      const top = shelfY + shelfT + 0.08;
-      lookY = top - halfH * 0.86;
+    const phone = stage.clientWidth < 760;
+    let span = mode === 'detail' && phone ? 1.55 : SPACING * 2 + 1.85;
+    let lookY = 0.12;
+    let camY = 0.38;
+    if (phone && mode !== 'detail' && pieces[0]) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      pieces.forEach(function (p) {
+        if (!p) return;
+        p.holder.updateWorldMatrix(true, true);
+        const box = new THREE.Box3().setFromObject(p.holder);
+        minX = Math.min(minX, box.min.x);
+        maxX = Math.max(maxX, box.max.x);
+        minY = Math.min(minY, box.min.y);
+        maxY = Math.max(maxY, box.max.y);
+      });
+      maxY = Math.max(maxY, shelfY + 0.16);
+      const contentW = Math.max(0.4, maxX - minX);
+      const contentH = Math.max(0.4, maxY - minY);
+      const pad = 16 / Math.max(1, stage.clientWidth);
+      span = contentW / (1 - 2 * pad);
+      const zW = (span / Math.max(0.45, aspect)) / (2 * half);
+      const zH = (contentH * 1.08) / (2 * half);
+      const zFit = Math.max(zW, zH);
+      lookY = (minY + maxY) / 2;
       camY = lookY;
+      camera.position.set((minX + maxX) / 2, camY, zFit);
+      camera.lookAt((minX + maxX) / 2, lookY, 0);
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(stage.clientWidth, stage.clientHeight);
+      return;
     }
+    const z = Math.max(3.2, (span / Math.max(0.5, aspect)) / (2 * half));
     camera.position.set(rackCenter, camY, z);
     camera.lookAt(rackCenter, lookY, 0);
     camera.updateProjectionMatrix();
@@ -668,6 +706,7 @@ function boot() {
       piece.rotator.userData.piece = piece;
     });
     layoutRack(null);
+    stage.__pieces = pieces;
     frame();
     (function loop() {
       applyVisuals();

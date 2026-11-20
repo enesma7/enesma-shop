@@ -62,6 +62,7 @@ function boot() {
   rail.rotation.z = Math.PI / 2;
   rail.position.set(rackCenter, RAIL_Y, 0.02);
   scene.add(rail);
+  const railHardware = [];
   [-1, 1].forEach(function (side) {
     const x = rackCenter + side * (railLen / 2 - 0.04);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.02 - WALL_Z), railMat);
@@ -69,6 +70,7 @@ function boot() {
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.012), railMat);
     plate.position.set(x, RAIL_Y, WALL_Z + 0.006);
     scene.add(arm, plate);
+    railHardware.push(arm, plate);
   });
 
   const velvet = new THREE.MeshStandardMaterial({ color: '#141416', roughness: 0.78, metalness: 0.04 });
@@ -328,27 +330,42 @@ function boot() {
     const box = new THREE.Box3().setFromObject(group);
     group.userData.top = box.max.y;
     group.userData.bottom = box.min.y;
+    group.userData.width = box.max.x - box.min.x;
     return group;
   }
 
-  function makeHanger() {
+  function makeHanger(barHalf) {
     const g = new THREE.Group();
-    const hookMat = gold.clone();
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0.12, 0),
-      new THREE.Vector3(0, 0.15, 0),
-      new THREE.Vector3(0.012, 0.175, 0),
-      new THREE.Vector3(0.046, 0.198, 0),
-      new THREE.Vector3(0.07, 0.168, 0),
-      new THREE.Vector3(0.05, 0.132, 0)
+    const metal = gold.clone();
+    metal.color.set('#e8d4a4');
+    metal.roughness = 0.1;
+    metal.metalness = 1;
+    metal.clearcoat = 0.9;
+    metal.clearcoatRoughness = 0.12;
+    const r = 0.005;
+    const railZ = 0.02;
+    const around = 0.012 + r;
+    const hook = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -0.075, 0.012),
+      new THREE.Vector3(0, -0.01, railZ + around),
+      new THREE.Vector3(0, around + 0.002, railZ),
+      new THREE.Vector3(0, around * 0.15, railZ - around),
+      new THREE.Vector3(0, -0.03, railZ - around * 0.72)
     ]);
-    const hook = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.011, 16, false), hookMat);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 12), hookMat);
-    neck.position.y = 0.135;
-    g.add(hook, neck);
+    const barW = Math.max(0.15, Math.min(0.32, barHalf));
+    const bar = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-barW, -0.15, 0.004),
+      new THREE.Vector3(-barW * 0.46, -0.07, 0.01),
+      new THREE.Vector3(0, -0.042, 0.014),
+      new THREE.Vector3(barW * 0.46, -0.07, 0.01),
+      new THREE.Vector3(barW, -0.15, 0.004)
+    ]);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(hook, 56, r, 14, false), metal));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(bar, 48, r * 0.82, 12, false), metal));
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r * 0.7, 0.038, 12), metal);
+    neck.position.set(0, -0.058, 0.013);
+    g.add(neck);
     g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
-    g.scale.setScalar(1.35);
-    g.position.y = -0.25;
     return g;
   }
 
@@ -387,6 +404,7 @@ function boot() {
   );
   shelfLip.position.set(rackCenter, shelfY + shelfT / 2, shelfZ);
   scene.add(shelfLip);
+  const rackParts = [rail, shelf, shelfLip].concat(railHardware);
   [-0.34, 0.34].forEach(function (t) {
     const x = rackCenter + t * shelfW;
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.05, shelfD * 0.78), shelfMat);
@@ -394,20 +412,23 @@ function boot() {
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.01), shelfMat);
     plate.position.set(x, shelfY - 0.01, WALL_Z + 0.006);
     scene.add(bracket, plate);
+    rackParts.push(bracket, plate);
   });
   const shelfShade = softShadow(shelfW * 1.05, shelfD * 0.7);
   shelfShade.rotation.x = -Math.PI / 2;
   shelfShade.position.set(rackCenter, shelfY - shelfT / 2 - 0.004, shelfZ + 0.02);
   scene.add(shelfShade);
+  rackParts.push(shelfShade);
   const capX = rackCenter;
 
   Promise.all(SPECS.map(async function (spec, index) {
     const colors = {};
     for (const color of ['black', 'white']) {
       const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
+      const v = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) ? ('?v=' + window.ENESMA_SHOP.ASSET) : '';
       colors[color] = {
-        front: await loadImage(base + '-front.png'),
-        back: await loadImage(base + '-back.png')
+        front: await loadImage(base + '-front.png' + v),
+        back: await loadImage(base + '-back.png' + v)
       };
     }
     const shells = {
@@ -417,7 +438,7 @@ function boot() {
     shells.white.visible = false;
     const rotator = new THREE.Group();
     rotator.add(shells.black, shells.white);
-    if (!spec.shelf) rotator.add(makeHanger());
+    if (!spec.shelf) rotator.add(makeHanger((shells.black.userData.width || 0.7) * 0.2));
     const holder = new THREE.Group();
     if (spec.shelf) {
       const drop = -shells.black.userData.bottom - 0.012;
@@ -449,12 +470,6 @@ function boot() {
       angle: spec.angle || 0,
       spin: 0
     };
-    if (spec.shelf) {
-      const shade = softShadow(0.22, 0.1);
-      shade.rotation.x = -Math.PI / 2;
-      shade.position.set(0, 0.001, 0.01);
-      holder.add(shade);
-    }
   })).then(start).catch(function () {
     sheet.hidden = false;
     sheet.innerHTML = '<h2>Gear</h2><p class="hint">The closet photos could not be loaded.</p>';
@@ -505,18 +520,44 @@ function boot() {
   }
 
   function layoutDetail(focus) {
+    const narrow = stage.clientWidth < 760;
     pieces.forEach(function (piece) {
       if (piece === focus) {
-        piece.x = rackCenter - 0.35;
+        piece.x = narrow ? rackCenter : rackCenter - 0.35;
         piece.y = piece.homeY;
-        piece.scale = 1.22;
+        piece.scale = narrow ? 1 : 1.22;
         piece.opacity = 1;
       } else {
-        piece.x = piece.homeX < focus.homeX ? -1.4 : rackCenter + 2.2;
-        piece.scale = 0.9;
-        piece.opacity = 0.12;
+        piece.x = piece.homeX < focus.homeX ? -2.6 : rackCenter + 3.4;
+        piece.scale = narrow ? 1 : 0.9;
+        piece.opacity = narrow ? 0 : 0.12;
       }
     });
+  }
+
+  function fitDetail(piece) {
+    piece.holder.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(piece.holder);
+    const width = Math.max(1, stage.clientWidth);
+    const cssH = Math.max(320, Math.round(Math.min(window.innerHeight * 0.58, 520)));
+    stage.style.height = cssH + 'px';
+    const contentW = Math.max(0.18, (box.max.x - box.min.x) * 1.16);
+    const contentH = Math.max(0.18, (box.max.y - box.min.y) * 1.14);
+    const half = Math.tan((camera.fov * Math.PI / 180) / 2);
+    camera.aspect = width / cssH;
+    const zW = (contentW / camera.aspect) / (2 * half);
+    const zH = contentH / (2 * half);
+    const zFit = Math.max(zW, zH, 1.4);
+    const cx = (box.min.x + box.max.x) / 2;
+    const cy = (box.min.y + box.max.y) / 2;
+    camera.position.set(cx, cy, zFit);
+    camera.lookAt(cx, cy, 0);
+    camera.updateProjectionMatrix();
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    if (renderer.getPixelRatio() !== ratio || renderer.domElement.clientWidth !== width || renderer.domElement.clientHeight !== cssH) {
+      renderer.setPixelRatio(ratio);
+      renderer.setSize(width, cssH);
+    }
   }
 
   function frame() {
@@ -524,9 +565,9 @@ function boot() {
     camera.aspect = aspect;
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
     const phone = stage.clientWidth < 760;
-    let span = mode === 'detail' && phone ? 1.55 : SPACING * 2 + 1.85;
-    let lookY = 0.12;
-    let camY = 0.38;
+    let span = SPACING * 2 + 1.85;
+    let lookY = 0.36;
+    let camY = 0.5;
     if (phone && mode !== 'detail' && pieces[0]) {
       let minX = rackCenter - railLen / 2 - 0.02;
       let maxX = rackCenter + railLen / 2 + 0.02;
@@ -543,8 +584,8 @@ function boot() {
       const contentH = Math.max(0.4, maxY - minY);
       const width = stage.clientWidth;
       const padPx = 16;
-      const topPx = -16;
-      const botPx = 12;
+      const topPx = 36;
+      const botPx = 16;
       span = contentW * width / Math.max(1, width - padPx * 2);
       const cssH = Math.max(200, Math.round(contentH / span * width + topPx + botPx));
       stage.style.height = cssH + 'px';
@@ -557,6 +598,10 @@ function boot() {
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(width, cssH);
+      return;
+    }
+    if (phone && mode === 'detail' && active) {
+      fitDetail(active);
       return;
     }
     const z = Math.max(3.2, (span / Math.max(0.5, aspect)) / (2 * half));
@@ -629,12 +674,16 @@ function boot() {
     hidePill();
     piece.spin = 0;
     layoutDetail(piece);
+    if (stage.clientWidth < 760) {
+      rackParts.forEach(function (part) { part.visible = !piece.spec.shelf && part === rail; });
+    }
     drawSheet();
     frame();
   }
   function leave() {
     active = null;
     mode = 'rack';
+    rackParts.forEach(function (part) { part.visible = true; });
     sheet.hidden = true;
     headline.hidden = false;
     stage.parentElement.classList.remove('detail');
@@ -708,9 +757,11 @@ function boot() {
     });
     layoutRack(null);
     stage.__pieces = pieces;
+    stage.__camera = camera;
     frame();
     (function loop() {
       applyVisuals();
+      if (stage.clientWidth < 760 && mode === 'detail' && active) fitDetail(active);
       if (hover && mode === 'rack') showPill(hover);
       renderer.render(scene, camera);
       requestAnimationFrame(loop);

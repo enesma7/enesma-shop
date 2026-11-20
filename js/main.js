@@ -4,11 +4,15 @@
   var UI = window.ShopUI;
   var h = UI.h;
 
+  var asset = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) || '';
+  function versioned(url) {
+    return asset ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + asset : url;
+  }
   function picture(id, color, view, alt) {
     var base = Cat.renderBase(id, color, view);
     var size = Cat.imageSize(id);
-    return '<picture><source srcset="' + base + '.webp" type="image/webp">' +
-      '<img src="' + base + '.jpg" alt="' + h(alt) + '" width="' + size.w + '" height="' + size.h + '"></picture>';
+    return '<picture><source srcset="' + versioned(base + '.webp') + '" type="image/webp">' +
+      '<img src="' + versioned(base + '.jpg') + '" alt="' + h(alt) + '" width="' + size.w + '" height="' + size.h + '"></picture>';
   }
 
   function home() {
@@ -21,7 +25,7 @@
       '</div>';
   }
   function tile(href, file, label) {
-    return '<a class="tile" href="' + href + '"><img src="assets/tiles/' + file + '.jpg" alt="" width="1280" height="720">' +
+    return '<a class="tile" href="' + href + '"><img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720">' +
       '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span></a>';
   }
 
@@ -298,7 +302,7 @@
       stage.className = 'closet';
       stage.innerHTML = '<h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="stage" id="stage"><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
       UI.$('#content').appendChild(stage);
-      import(window.SHOP_BASE + 'js/closet.js').catch(function () { showFallback(); });
+      import(window.SHOP_BASE + 'js/closet.js?v=' + ((window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) || '1')).catch(function () { showFallback(); });
     } else if (page === 'admin') {
       import(window.SHOP_BASE + 'js/admin.js');
     }

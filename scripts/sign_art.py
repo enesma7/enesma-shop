@@ -41,7 +41,30 @@ def paste_logo(canvas, logo, cx, y, width):
     canvas.alpha_composite(logo, (int(cx - width / 2), int(y)))
     return h
 
-def for_sale(dark=False):
+def illyrian_ring(diameter, thickness):
+    """Open ring in the Illyrian Red gradient, #EF0207 into #9A0007."""
+    im = Image.new("RGBA", (diameter, diameter), (0, 0, 0, 0))
+    px = im.load()
+    c = (diameter - 1) / 2.0
+    outer = diameter / 2.0 - 1.5
+    inner = outer - thickness
+    for y in range(diameter):
+        for x in range(diameter):
+            dist = ((x - c) ** 2 + (y - c) ** 2) ** 0.5
+            if inner - 1.4 <= dist <= outer + 1.4:
+                fade = 1.0
+                if dist > outer:
+                    fade = max(0.0, 1 - (dist - outer) / 1.4)
+                elif dist < inner:
+                    fade = max(0.0, 1 - (inner - dist) / 1.4)
+                t = x / max(1, diameter - 1)
+                r = int(239 + (154 - 239) * t)
+                g = int(2 + (0 - 2) * t)
+                px[x, y] = (r, g, 7, int(255 * fade))
+    return im
+
+
+def for_sale(dark=False, material="Plastic"):
     W, H = 1800, 2400
     bg = (12, 12, 14, 255) if dark else (248, 248, 246, 255)
     fg = (248, 248, 246, 255) if dark else (10, 10, 12, 255)
@@ -60,22 +83,31 @@ def for_sale(dark=False):
     for ch, wch in zip(text, widths):
         d.text((x, y), ch, font=f, fill=fg)
         x += wch + gap
-    # Standing placeholder, fully on the board, lower left. Name sits to its right.
+    label_f = font(FONT_M, 36)
+    label = material
+    lw = d.textlength(label, font=label_f)
+    d.text((W - 90 - lw, 168), label, font=label_f, fill=muted)
+    # Standing placeholder stays on the left. The name, phone, and ring sit in the right half.
     agent = cutout_agent(980)
-    ax, ay = 90, H - agent.height - 70
+    ax, ay = 70, H - agent.height - 70
     im.alpha_composite(agent, (ax, ay))
-    nx = ax + agent.width + 40
-    ny = ay + 80
-    d.text((nx, ny), "AGENT", font=font(FONT_B, 84), fill=fg)
-    name_f = font(FONT_B, 64)
+    ring_d = 188
+    ring = illyrian_ring(ring_d, 14)
+    rx = 1088
+    ry = ay + 90
+    im.alpha_composite(ring, (rx, ry))
+    nx = rx + ring_d + 40
+    ny = ry + 6
+    d.text((nx, ny), "AGENT", font=font(FONT_B, 64), fill=fg)
+    name_f = font(FONT_B, 52)
     letters = "NAME"
-    lw = [d.textlength(ch, font=name_f) for ch in letters]
-    gapn = 14
+    widths = [d.textlength(ch, font=name_f) for ch in letters]
+    gapn = 12
     xx = nx
-    for ch, wch in zip(letters, lw):
-        d.text((xx, ny + 100), ch, font=name_f, fill=fg)
+    for ch, wch in zip(letters, widths):
+        d.text((xx, ny + 78), ch, font=name_f, fill=fg)
         xx += wch + gapn
-    d.text((nx, ny + 200), "(000) 000-0000", font=font(FONT_M, 40), fill=fg)
+    d.text((nx, ny + 156), "(000) 000-0000", font=font(FONT_M, 32), fill=fg)
     dre = "DRE# 00000000"
     df = font(FONT_R, 30)
     dw = d.textlength(dre, font=df)
@@ -193,9 +225,20 @@ def open_house(dark=False):
     return im
 
 def main():
+    renders = os.path.join(ROOT, "assets/renders")
+    os.makedirs(renders, exist_ok=True)
     for dark, name in ((False, "white"), (True, "black")):
-        for_sale(dark).convert("RGB").save(os.path.join(OUT, f"for-sale-{name}.png"), quality=95)
         open_house(dark).convert("RGB").save(os.path.join(OUT, f"open-house-{name}.png"), quality=95)
+        for material, kind in (("Plastic", "for-sale-plastic"), ("Aluminum", "for-sale-aluminum")):
+            art = for_sale(dark, material).convert("RGB")
+            if material == "Plastic":
+                art.save(os.path.join(OUT, f"for-sale-{name}.png"), quality=95)
+            base = os.path.join(renders, f"{kind}-{name}-hero")
+            art.save(base + ".jpg", quality=92, optimize=True)
+            art.save(base + ".webp", quality=86, method=4)
+            thumb = art.copy()
+            thumb.thumbnail((720, 960))
+            thumb.save(base + "-thumb.webp", quality=82, method=4)
         print("wrote", name)
 
 if __name__ == "__main__":

@@ -73,10 +73,12 @@ for (const color of colors) {
       yaw: 0.46
     };
     if (product === 'open-house') {
-      job.width = 2400;
-      job.height = 1600;
-      job.yaw = 0.18;
-      job.fill = 0.9;
+      job.width = 1600;
+      job.height = 2000;
+      job.yaw = 0.42;
+      job.fill = 0.72;
+      job.lift = 0;
+      job.background = '#f3f1ed';
     } else if (product === 'a-frame') {
       job.width = 2000;
       job.height = 1500;
@@ -108,6 +110,7 @@ const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader']
 });
 const page = await browser.newPage();
+await page.setCacheEnabled(false);
 page.on('pageerror', (err) => console.log('PAGEERROR', err.message));
 await page.goto('http://127.0.0.1:4173/tools/render.html', { waitUntil: 'networkidle0', timeout: 60000 });
 await page.waitForFunction('window.__ready === true', { timeout: 30000 });

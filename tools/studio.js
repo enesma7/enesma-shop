@@ -382,65 +382,52 @@ function buildAFrame(color) {
   const group = new THREE.Group();
   const wire = new THREE.MeshPhysicalMaterial({
     color: '#141418',
-    roughness: 0.34,
-    metalness: 0.82,
-    clearcoat: 0.4,
-    clearcoatRoughness: 0.32
+    roughness: 0.3,
+    metalness: 0.86,
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.25
   });
-  const clipMat = new THREE.MeshPhysicalMaterial({
-    color: '#0a0a0c',
-    roughness: 0.24,
-    metalness: 0.7,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.2
-  });
-  const frameW = 0.71;
-  const legLen = 1.05;
-  const tubeR = 0.0034;
-  const spread = 0.28;
-  const alpha = Math.asin(spread / legLen);
-  const cosA = Math.cos(alpha);
-  const sinA = Math.sin(alpha);
-  const cy = (legLen / 2) * cosA;
-
-  const front = roundedRectMesh(frameW, legLen, tubeR, 0.05, wire);
-  front.rotation.x = -alpha;
-  front.position.set(0, cy, 0.008 + (legLen / 2) * sinA);
-  const back = roundedRectMesh(frameW, legLen, tubeR, 0.05, wire);
-  back.rotation.x = alpha;
-  back.position.set(0, cy, -0.008 - (legLen / 2) * sinA);
-  group.add(front, back);
-
-  const hingeY = cy + (legLen / 2) * cosA;
-  const barZ = 0.008;
-  group.add(tubeAlong([
-    new THREE.Vector3(-0.09, hingeY, 0),
-    new THREE.Vector3(-0.09, hingeY + 0.048, 0),
-    new THREE.Vector3(-0.05, hingeY + 0.066, 0),
-    new THREE.Vector3(0.05, hingeY + 0.066, 0),
-    new THREE.Vector3(0.09, hingeY + 0.048, 0),
-    new THREE.Vector3(0.09, hingeY, 0)
-  ], tubeR * 0.92, wire));
-
-  const clip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0085, 0.022, 6, 16), clipMat);
-  clip.rotation.z = Math.PI / 2;
-  clip.position.set(0, hingeY + 0.078, 0);
-  group.add(clip);
-
-  // 24 in wide. Height follows the Open House art, which is 18×12 (3:2), so 16 in tall.
+  // Landscape open-house panel, 3:2. The frame is only a little taller than the sign.
   const signW = 0.6096;
   const signH = signW * (2 / 3);
-  const ringR = 0.018;
-  const ringXs = [-signW * 0.28, signW * 0.28];
+  const frameW = signW + 0.09;
+  const gapTop = 0.04;
+  const gapBot = 0.095;
+  const frameH = gapTop + signH + gapBot;
+  const tubeR = 0.0042;
+  const footZ = 0.075;
+
+  function wing(direction) {
+    const pivot = new THREE.Group();
+    pivot.position.y = frameH;
+    const frame = roundedRectMesh(frameW, frameH, tubeR, 0.04, wire);
+    frame.position.y = -frameH / 2;
+    pivot.add(frame);
+    pivot.rotation.x = direction * Math.atan(footZ / frameH);
+    return pivot;
+  }
+  group.add(wing(1), wing(-1));
+
+  group.add(tubeAlong([
+    new THREE.Vector3(-0.075, frameH, 0),
+    new THREE.Vector3(-0.075, frameH + 0.028, 0),
+    new THREE.Vector3(-0.04, frameH + 0.046, 0),
+    new THREE.Vector3(0.04, frameH + 0.046, 0),
+    new THREE.Vector3(0.075, frameH + 0.028, 0),
+    new THREE.Vector3(0.075, frameH, 0)
+  ], tubeR * 0.9, wire));
+
+  const ringR = 0.016;
+  const ringXs = [-signW * 0.32, signW * 0.32];
   for (const x of ringXs) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringR, 0.002, 14, 32), wire);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringR, 0.0018, 12, 28), wire);
     ring.rotation.y = Math.PI / 2;
-    ring.position.set(x, hingeY - ringR * 0.15, barZ);
+    ring.position.set(x, frameH - ringR * 0.15, 0);
     group.add(ring);
   }
-  const signTop = hingeY - ringR * 2.15;
-  const panel = openHouseBoard(signW, signH, 0.005, color);
-  panel.position.set(0, signTop - signH / 2, barZ + 0.012);
+  const signTop = frameH - gapTop;
+  const panel = openHouseBoard(signW, signH, 0.004, color);
+  panel.position.set(0, signTop - signH / 2, 0);
   group.add(panel);
   return group;
 }

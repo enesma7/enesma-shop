@@ -21,8 +21,8 @@
       '</div>';
   }
   function tile(href, file, label) {
-    return '<a class="tile" href="' + href + '"><picture><source srcset="assets/renders/' + file + '.webp" type="image/webp">' +
-      '<img src="assets/renders/' + file + '.jpg" alt=""></picture><span>' + label + '</span></a>';
+    return '<a class="tile" href="' + href + '"><img src="assets/tiles/' + file + '.jpg" alt="" width="1280" height="720">' +
+      '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span></a>';
   }
 
   function category(cat, title, lede) {
@@ -41,7 +41,7 @@
     var product = Cat.find(sku);
     if (!product) { UI.$('#content').innerHTML = '<section class="section"><h1>Not Found</h1></section>'; return; }
     document.title = product.name + ' · ENESMA Shop';
-    var state = { color: 'black', size: 'M', variantId: product.variants ? product.variants[0].id : '', agentName: false, agentNameText: '', backEmblem: false, qty: 1, personal: { photoMode: 'email' } };
+    var state = { color: 'black', size: 'M', variantId: product.variants ? product.variants[0].id : '', agentName: false, agentNameText: '', qty: 1, personal: { photoMode: 'email' } };
     var root = document.createElement('div');
     root.className = 'product';
     root.innerHTML = '<div class="gallery" id="gallery"></div><div class="buy" id="buy"></div>';
@@ -54,7 +54,7 @@
         return picture(product.id, state.color, view, product.name + ' in ' + (state.color === 'white' ? 'White' : 'Black'));
       }).join('');
       var html = '<h1>' + h(product.name) + '</h1><p class="detail">' + h(product.detail) + '</p>' +
-        '<p class="price" id="price">' + Cat.money(priced.unit) + (priced.pending.length ? ' · Pending Not Included' : '') + '</p>' +
+        '<p class="price" id="price">' + Cat.money(priced.unit) + '</p>' +
         '<p class="blurb">' + h(product.blurb) + '</p>';
       html += '<div class="opt"><div class="lbl">Color</div><div class="pills" id="colors">' +
         '<button type="button" class="swatch" data-color="black" aria-pressed="' + (state.color === 'black') + '"><i style="background:#141418"></i><span class="sr">Black</span></button>' +
@@ -76,15 +76,9 @@
         html += '<label class="check"><input type="checkbox" id="agentName"' + (state.agentName ? ' checked' : '') + '> Agent Name (+' + Cat.money(window.ENESMA_CATALOG.agentNamePrice) + ')</label>' +
           '<div class="field" id="nameField"' + (state.agentName ? '' : ' hidden') + '><label for="agentNameText">Agent Name</label><input id="agentNameText" maxlength="24" value="' + h(state.agentNameText) + '"></div>';
       }
-      if (product.backEmblem) {
-        var emblemLabel = window.ENESMA_CATALOG.backEmblemPrice == null
-          ? 'Back Emblem (Pending Price)'
-          : 'Back Emblem (+' + Cat.money(window.ENESMA_CATALOG.backEmblemPrice) + ')';
-        html += '<label class="check"><input type="checkbox" id="backEmblem"' + (state.backEmblem ? ' checked' : '') + '> ' + emblemLabel + '</label>';
-      }
       if (product.personal) html += personalFields(state.personal);
       if (product.category === 'gear') {
-        html += '<p class="note">One-time setup fees may apply (DTF $15 setup, embroidery $50 digitizing), confirmed by Grafek Printing. The back emblem is shown on the garment. Its price is pending and is not charged until Grafek confirms it.</p>';
+        html += '<p class="note">One-time setup fees may apply (DTF $15 setup, embroidery $50 digitizing), confirmed by Grafek Printing.</p>';
       }
       html += '<div class="field"><label for="qty">Quantity</label><input id="qty" inputmode="numeric" value="' + state.qty + '"></div>';
       html += '<button class="btn" id="addBtn" type="button">Add To Cart</button>';
@@ -105,8 +99,6 @@
       if (agent) agent.onchange = function () { state.agentName = agent.checked; draw(); };
       var name = UI.$('#agentNameText');
       if (name) name.oninput = function () { state.agentNameText = name.value; UI.$('#price').textContent = Cat.money(Cat.priceOf(product, state).unit); };
-      var emblem = UI.$('#backEmblem');
-      if (emblem) emblem.onchange = function () { state.backEmblem = emblem.checked; draw(); };
       bindPersonal(state);
       UI.$('#qty').oninput = function (ev) { state.qty = Math.max(1, Math.min(20, parseInt(ev.target.value, 10) || 1)); };
       UI.$('#addBtn').onclick = function () {
@@ -250,7 +242,6 @@
             lineTotal: Math.round(line.unit * line.qty * 100) / 100,
             pending: line.pending || [],
             agentName: sel.agentNameText || '',
-            backEmblem: !!sel.backEmblem,
             personal: {
               name: personal.name || '',
               phone: personal.phone || '',
@@ -305,7 +296,7 @@
       document.title = 'Gear · ENESMA Shop';
       var stage = document.createElement('div');
       stage.className = 'closet';
-      stage.innerHTML = '<div class="stage" id="stage"><h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
+      stage.innerHTML = '<h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="stage" id="stage"><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
       UI.$('#content').appendChild(stage);
       import(window.SHOP_BASE + 'js/closet.js').catch(function () { showFallback(); });
     } else if (page === 'admin') {

@@ -359,10 +359,7 @@
       'void main() {',
       '  vec3 n = normalize(vN);',
       '  float ndl = clamp(dot(n, normalize(vec3(0.28, 0.58, 0.76))), 0.0, 1.0);',
-      '  float rim = pow(1.0 - abs(dot(n, vec3(0.0, 0.0, 1.0))), 1.35);',
-      '  vec3 gold = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), clamp(n.y * 0.5 + 0.5, 0.0, 1.0));',
       '  vec3 col = mix(mix(vec3(0.0, 0.0, 0.02745), vCol, 0.34), vCol, 0.12 + 0.88 * ndl);',
-      '  col = mix(col, gold, rim * 0.16);',
       '  gl_FragColor = vec4(col, 1.0);',
       '}'
     ].join('\n');
@@ -392,7 +389,6 @@
       'uniform float uTime, uAspect, uFocal, uCam, uLogoW, uLift;',
       'varying vec2 vUv;',
       'varying float vA;',
-      'varying float vGlow;',
       'void main() {',
       '  float t = uTime;',
       '  float glitch = 0.0;',
@@ -411,9 +407,6 @@
       '  else if (t >= 1.14 && t < 3.7) a = 0.0;',
       '  else if (t >= 3.7 && t < 3.98) a = (t - 3.7) / 0.28;',
       '  vA = a;',
-      '  float glowIn = smoothstep(3.96, 4.12, t);',
-      '  float glowOut = 1.0 - smoothstep(4.35, 4.9, t);',
-      '  vGlow = glowIn * glowOut;',
       '}'
     ].join('\n');
 
@@ -421,7 +414,6 @@
       'precision highp float;',
       'varying vec2 vUv;',
       'varying float vA;',
-      'varying float vGlow;',
       'uniform sampler2D uTex;',
       'uniform float uTime;',
       'void main() {',
@@ -432,49 +424,17 @@
       '  float diag = vUv.x * 0.9 + vUv.y * 0.22;',
       '  float head = u * 1.45 - 0.22;',
       '  float d = diag - head;',
-      '  float band = exp(-d * d * 70.0);',
-      '  float core = exp(-d * d * 280.0);',
-      '  float env = smoothstep(0.0, 0.06, u) * (1.0 - smoothstep(0.78, 1.0, u));',
-      '  float sweep = (band * 0.72 + core * 0.55) * env;',
-      '  vec3 foil = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), clamp(vUv.x, 0.0, 1.0));',
-      '  vec3 col = mix(tex.rgb, mix(tex.rgb, foil, 0.58), clamp(sweep, 0.0, 1.0));',
+      '  float band = exp(-d * d * 42.0);',
+      '  float env = smoothstep(0.0, 0.05, u) * (1.0 - smoothstep(0.8, 1.0, u));',
+      '  float sweep = band * env;',
+      '  vec3 col = mix(tex.rgb, vec3(0.98431), clamp(sweep, 0.0, 0.7));',
       '  gl_FragColor = vec4(col, tex.a * vA);',
-      '}'
-    ].join('\n');
-
-    var fsGlow = [
-      'precision mediump float;',
-      'varying vec2 vUv;',
-      'varying float vA;',
-      'varying float vGlow;',
-      'uniform sampler2D uTex;',
-      'uniform vec2 uBlur;',
-      'void main() {',
-      '  if (vGlow < 0.01) discard;',
-      '  vec2 b = uBlur;',
-      '  float halo = 0.0;',
-      '  halo += texture2D(uTex, vUv + vec2(b.x, 0.0)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(-b.x, 0.0)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(0.0, b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(0.0, -b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(b.x, b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(-b.x, b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(b.x, -b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(-b.x, -b.y)).a;',
-      '  halo += texture2D(uTex, vUv + vec2(b.x, 0.0) * 1.8).a;',
-      '  halo += texture2D(uTex, vUv + vec2(-b.x, 0.0) * 1.8).a;',
-      '  halo += texture2D(uTex, vUv + vec2(0.0, b.y) * 1.8).a;',
-      '  halo += texture2D(uTex, vUv + vec2(0.0, -b.y) * 1.8).a;',
-      '  halo *= 0.083;',
-      '  vec3 gold = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), vUv.x);',
-      '  gl_FragColor = vec4(gold, halo * vGlow * 0.22);',
       '}'
     ].join('\n');
 
     var cubeProg = link(vsCube, fsCube, ['aPos', 'aNrm', 'aHome', 'aBurst', 'aExtra', 'aKind']);
     var bgProg = link(vsBg, fsBg, ['aClip']);
     var logoProg = link(vsMark, fsLogo, ['aPos', 'aUv']);
-    var glowProg = link(vsMark, fsGlow, ['aPos', 'aUv']);
 
     function buffer(data) {
       var b = gl.createBuffer();
@@ -622,13 +582,6 @@
         gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
       }
 
-      if (t >= 3.88 && t <= 4.85) {
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-        mark(glowProg);
-        var blurPx = 34.0;
-        gl.uniform2f(gl.getUniformLocation(glowProg, 'uBlur'), blurPx / texCanvas.width, blurPx / texCanvas.height);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       mark(logoProg);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

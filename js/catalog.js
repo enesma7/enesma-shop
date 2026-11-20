@@ -123,7 +123,7 @@
         category: 'cards',
         name: 'Business Cards',
         detail: 'Set Of 1,000',
-        image: { w: 2400, h: 1500 },
+        image: { w: 2400, h: 1320 },
         blurb: 'A set of 1,000 business cards, printed with your photo and contact details.',
         price: 57,
         sizes: false,

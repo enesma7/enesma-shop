@@ -200,7 +200,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 
 .hp { position: absolute; left: -9999px; height: 0; overflow: hidden; }
 
-.closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #e6dfd4; color: #141418; }
+.closet { position: relative; display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #e6dfd4; color: #141418; }
 .stage { position: relative; height: 70vh; min-height: 420px; background: #e6dfd4; }
 .closet-headline {
   position: absolute; z-index: 2; left: 22px; top: 28px; max-width: 11ch;
@@ -264,7 +264,12 @@ h1, h2, h3, p { text-wrap: pretty; }
 
 @media (max-width: 759px) {
   .drawer { width: 100%; }
-  .closet-headline { top: auto; bottom: 18px; font-size: 28px; text-shadow: 0 1px 0 #f4f2ee; }
+  .closet { height: calc(100dvh - var(--header)); min-height: 0; overflow: hidden; }
+  .closet-headline {
+    position: relative; top: auto; left: auto; bottom: auto;
+    margin: 10px 16px 0; max-width: 14ch; font-size: 26px;
+  }
+  .stage { flex: 1; height: auto; min-height: 0; }
   .closet.detail { flex-direction: column; }
   .closet.detail .stage { height: 54vh; min-height: 320px; flex: none; }
   .closet.detail .sheet {

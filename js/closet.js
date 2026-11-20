@@ -6,9 +6,9 @@ const Cat = window.ShopCatalog;
 const Cart = window.ShopCart;
 
 const SPECS = [
-  { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.02 },
-  { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.02 },
-  { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.02 },
+  { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.006 },
+  { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.006 },
+  { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.006 },
   { sku: 'cap', hang: 'cap', tall: 0.24, shelf: true, bulge: 0.018, thick: 0.014, angle: 0.28 }
 ];
 
@@ -135,9 +135,19 @@ function boot() {
         if (y > maxY) maxY = y;
       }
     }
-    for (let i = 1; i < samples.length - 1; i++) {
-      samples[i].l = (samples[i - 1].l + samples[i].l * 2 + samples[i + 1].l) / 4;
-      samples[i].r = (samples[i - 1].r + samples[i].r * 2 + samples[i + 1].r) / 4;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 1; i < samples.length; i++) {
+        const prev = samples[i - 1];
+        const jump = 6;
+        samples[i].l = Math.max(prev.l - jump, Math.min(prev.l + jump, samples[i].l));
+        samples[i].r = Math.max(prev.r - jump, Math.min(prev.r + jump, samples[i].r));
+      }
+      for (let i = samples.length - 2; i >= 0; i--) {
+        const next = samples[i + 1];
+        const jump = 6;
+        samples[i].l = Math.max(next.l - jump, Math.min(next.l + jump, samples[i].l));
+        samples[i].r = Math.max(next.r - jump, Math.min(next.r + jump, samples[i].r));
+      }
     }
     const opaque = Math.max(1, maxY - minY);
     const worldH = spec.tall * (ih / opaque);
@@ -167,7 +177,7 @@ function boot() {
       const vNorm = (s.y - minY) / opaque;
       for (let i = 0; i <= cols; i++) {
         const t = i / cols;
-        const inset = Math.min(4, (s.r - s.l) * 0.03);
+        const inset = Math.min(3, (s.r - s.l) * 0.02);
         const px = (s.l + inset) + (s.r - s.l - inset * 2) * t;
         const u = px / iw;
         const v = 1 - (s.y + 0.5) / ih;
@@ -215,11 +225,11 @@ function boot() {
       }
       return sum / Math.max(1, n) < 1.5 ? dark : light;
     }
-    function addLip(a, b, outward, color) {
+    function addLip(a, b, outward, color, force) {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      if (Math.hypot(dx, dy) < 0.0008 || Math.hypot(dx, dy) > 0.05) return;
-      if (Math.abs(dx) > Math.abs(dy) * 0.35) return;
+      if (Math.hypot(dx, dy) < 0.0004) return;
+      if (!force && Math.hypot(dx, dy) > 0.12) return;
       const segs = 4;
       const rings = [[], []];
       [a, b].forEach(function (p, pi) {
@@ -249,8 +259,21 @@ function boot() {
         backIdx.push(a.back[i], a.back[i + 1], b.back[i], a.back[i + 1], b.back[i + 1], b.back[i]);
       }
       const cloth = clothAt(a);
-      addLip(pointAt(a, 0), pointAt(b, 0), -1, cloth);
-      addLip(pointAt(a, cols), pointAt(b, cols), 1, cloth);
+      addLip(pointAt(a, 0), pointAt(b, 0), -1, cloth, false);
+      addLip(pointAt(a, cols), pointAt(b, cols), 1, cloth, false);
+    }
+    function seal(row) {
+      const cloth = clothAt(row);
+      const n = 12;
+      for (let i = 0; i < n; i++) {
+        const i0 = Math.round(cols * i / n);
+        const i1 = Math.round(cols * (i + 1) / n);
+        addLip(pointAt(row, i0), pointAt(row, i1), 0, cloth, true);
+      }
+    }
+    if (rows.length) {
+      seal(rows[0]);
+      seal(rows[rows.length - 1]);
     }
     function geo(pos, uv, idx, colors) {
       const g = new THREE.BufferGeometry();
@@ -284,7 +307,7 @@ function boot() {
     const frontMesh = new THREE.Mesh(geo(frontPos, frontUv, frontIdx), frontMat);
     const backMesh = new THREE.Mesh(geo(backPos, backUv, backIdx), backMat);
     const edgeMesh = new THREE.Mesh(geo(edgePos, null, edgeIdx, edgeCol), edgeMat);
-    [frontMesh, backMesh, edgeMesh].forEach(function (mesh) {
+    [frontMesh, backMesh].forEach(function (mesh) {
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       group.add(mesh);
@@ -297,21 +320,7 @@ function boot() {
 
   function makeHanger() {
     const g = new THREE.Group();
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.23, -0.012);
-    shape.bezierCurveTo(-0.14, 0.1, 0.14, 0.1, 0.23, -0.012);
-    shape.lineTo(0.21, -0.034);
-    shape.bezierCurveTo(0.1, 0.062, -0.1, 0.062, -0.21, -0.034);
-    shape.closePath();
-    const bodyGeo = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.018, bevelEnabled: true, bevelThickness: 0.0035, bevelSize: 0.0035, bevelSegments: 2, curveSegments: 18
-    });
-    bodyGeo.translate(0, 0, -0.009);
-    const bodyMat = velvet.clone();
     const hookMat = gold.clone();
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.009, 0.012), bodyMat);
-    bar.position.set(0, -0.026, 0);
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0.075, 0),
       new THREE.Vector3(0, 0.13, 0),
@@ -321,9 +330,9 @@ function boot() {
       new THREE.Vector3(0.05, 0.132, 0)
     ]);
     const hook = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.011, 16, false), hookMat);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.028, 16), hookMat);
-    neck.position.y = 0.06;
-    g.add(body, bar, hook, neck);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 12), hookMat);
+    neck.position.y = 0.05;
+    g.add(hook, neck);
     g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
     g.scale.setScalar(1.35);
     g.position.y = -0.25;
@@ -351,7 +360,7 @@ function boot() {
   }
 
   const pieces = [];
-  const shelfW = SPACING * 2 + 0.55;
+  const shelfW = railLen * 0.4;
   const shelfD = 0.2;
   const shelfT = 0.012;
   const shelfY = RAIL_Y + 0.52;
@@ -377,7 +386,7 @@ function boot() {
   shelfShade.rotation.x = -Math.PI / 2;
   shelfShade.position.set(rackCenter, shelfY - shelfT / 2 - 0.004, shelfZ + 0.02);
   scene.add(shelfShade);
-  const capX = rackCenter + shelfW * 0.28;
+  const capX = rackCenter;
 
   Promise.all(SPECS.map(async function (spec, index) {
     const colors = {};
@@ -501,10 +510,19 @@ function boot() {
     const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
     camera.aspect = aspect;
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
-    const span = mode === 'detail' && aspect < 1 ? 1.7 : SPACING * 2 + 1.85;
-    const z = Math.max(3.2, (span / Math.max(0.5, aspect)) / (2 * half));
-    camera.position.set(rackCenter, 0.42, z);
-    camera.lookAt(rackCenter, 0.16, 0);
+    const phone = aspect < 0.95;
+    const span = mode === 'detail' && phone ? 1.45 : phone ? SPACING * 2 + 0.95 : SPACING * 2 + 1.85;
+    const z = Math.max(phone ? 2.4 : 3.2, (span / Math.max(0.45, aspect)) / (2 * half));
+    let lookY = 0.16;
+    let camY = 0.42;
+    if (phone && mode !== 'detail') {
+      const halfH = z * half;
+      const top = shelfY + shelfT + 0.08;
+      lookY = top - halfH * 0.86;
+      camY = lookY;
+    }
+    camera.position.set(rackCenter, camY, z);
+    camera.lookAt(rackCenter, lookY, 0);
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(stage.clientWidth, stage.clientHeight);

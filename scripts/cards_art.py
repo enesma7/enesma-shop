@@ -110,31 +110,31 @@ def radial_stage(w, h):
     return Image.fromarray(rgb.astype(np.uint8), "RGB")
 
 
-def card_sprite(face, thick=16):
+def card_sprite(face, thick=14):
     """A 3.5×2 card with a thin stock edge and a soft drop shadow."""
     face = face.convert("RGBA")
     w, h = face.size
-    canvas = Image.new("RGBA", (w + thick + 80, h + thick + 90), (0, 0, 0, 0))
-    edge = Image.new("RGBA", (w, h), (22, 22, 24, 255))
+    canvas = Image.new("RGBA", (w + thick + 6, h + thick + 8), (0, 0, 0, 0))
     for i in range(thick, 0, -1):
         shade = 18 + int(28 * (i / thick))
         edge = Image.new("RGBA", (w, h), (shade, shade, shade + 2, 255))
-        canvas.alpha_composite(edge, (40 + i, 24 + i))
-    canvas.alpha_composite(face, (40, 24))
+        canvas.alpha_composite(edge, (i, i))
+    canvas.alpha_composite(face, (0, 0))
     return canvas
 
 
 def studio_pair(front_im, back_im):
-    stage = radial_stage(2400, 1500).convert("RGBA")
-    card_w = 980
+    stage_w, stage_h = 2400, 1320
+    stage = radial_stage(stage_w, stage_h).convert("RGBA")
+    gap = 36
+    card_w = int((stage_w * 0.85 - gap) / 2)
     sprites = []
     for im in (front_im, back_im):
         face = im.convert("RGBA").resize((card_w, int(card_w * im.height / im.width)), Image.Resampling.LANCZOS)
-        sprites.append(card_sprite(face, 18))
-    gap = 70
+        sprites.append(card_sprite(face, 14))
     total = sprites[0].width + gap + sprites[1].width
     x = (stage.width - total) // 2
-    y = (stage.height - sprites[0].height) // 2 + 10
+    y = (stage.height - sprites[0].height) // 2 + 6
     for sprite, dx in ((sprites[0], 0), (sprites[1], sprites[0].width + gap)):
         shadow = Image.new("RGBA", sprite.size, (0, 0, 0, 0))
         alpha = sprite.split()[-1].filter(ImageFilter.GaussianBlur(22))

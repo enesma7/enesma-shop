@@ -296,7 +296,7 @@
       document.title = 'Gear · ENESMA Shop';
       var stage = document.createElement('div');
       stage.className = 'closet';
-      stage.innerHTML = '<div class="stage" id="stage"><h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
+      stage.innerHTML = '<h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="stage" id="stage"><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
       UI.$('#content').appendChild(stage);
       import(window.SHOP_BASE + 'js/closet.js').catch(function () { showFallback(); });
     } else if (page === 'admin') {

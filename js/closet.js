@@ -9,7 +9,7 @@ const SPECS = [
   { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.006 },
   { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.006 },
   { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.006 },
-  { sku: 'cap', hang: 'cap', tall: 0.16, shelf: true, bulge: 0, thick: 0, angle: Math.PI / 2 }
+  { sku: 'cap', hang: 'cap', tall: 0.16, shelf: true, bulge: 0, thick: 0, angle: 1.05 }
 ];
 
 const RAIL_Y = 0.36;
@@ -267,6 +267,50 @@ function boot() {
     }
     despike('l');
     despike('r');
+    // The front and back torsos are not the same width, so their overlap steps
+    // in just under the sleeve and the body reads as two stacked pieces.
+    // Keep the sleeves, and make the side seam one smooth contour to the hem.
+    (function smoothTorso() {
+      const n = samples.length;
+      if (n < 16) return;
+      const widthAt = samples.map(function (s) { return s.r - s.l; });
+      const lo = Math.floor(n * 0.4);
+      const hi = Math.floor(n * 0.8);
+      const band = widthAt.slice(lo, hi).slice().sort(function (a, b) { return a - b; });
+      const torso = band[band.length >> 1];
+      if (!(torso > 8)) return;
+      const sleeveCut = torso * 1.16;
+      const hemCut = torso * 0.82;
+      const isTorso = widthAt.map(function (width, i) {
+        return i > 2 && width < sleeveCut && width > hemCut;
+      });
+      const radius = 16;
+      const nextL = samples.map(function (s) { return s.l; });
+      const nextR = samples.map(function (s) { return s.r; });
+      for (let i = 0; i < n; i++) {
+        if (!isTorso[i]) continue;
+        let sumL = 0;
+        let sumR = 0;
+        let sumW = 0;
+        for (let k = -radius; k <= radius; k++) {
+          const j = i + k;
+          if (j < 0 || j >= n || !isTorso[j]) continue;
+          const weight = radius + 1 - Math.abs(k);
+          sumL += samples[j].l * weight;
+          sumR += samples[j].r * weight;
+          sumW += weight;
+        }
+        if (sumW > 0) {
+          nextL[i] = sumL / sumW;
+          nextR[i] = sumR / sumW;
+        }
+      }
+      for (let i = 0; i < n; i++) {
+        if (!isTorso[i]) continue;
+        samples[i].l = nextL[i];
+        samples[i].r = nextR[i];
+      }
+    })();
     // A sleeve hem can fall between two samples and become one long triangle.
     // That triangle stretches the gray edge into a shelf. Step the edge across.
     const eased = [samples[0]];
@@ -557,41 +601,190 @@ function boot() {
     return g;
   }
 
-  function photoCap(images) {
-    const group = new THREE.Group();
-    const width = 0.46;
-    const views = images.map(function (img) {
+  // One solid cap. u = ((ang + PI) / (2*PI) + 0.25) % 1 with ang = atan2(x, z),
+  // so the front is u=0.75, the center back seam is u=0.25, and the texture
+  // seam sits on the empty right side. v=0 is the sweatband.
+  function makeCap(crownImg, billImg, light) {
+    const baseRx = 0.168;
+    const baseRz = 0.156;
+    const height = 0.158;
+    const rings = 40;
+    const segs = 96;
+    const crownPos = [];
+    const crownUv = [];
+    const crownCol = [];
+    const crownIdx = [];
+
+    function radK(t) {
+      // Mid-profile dome: full width at the sweatband, rounding in toward the button.
+      const elev = t * Math.PI * 0.5;
+      return Math.pow(Math.cos(elev), 0.78);
+    }
+    function angOf(j) {
+      // Start at the wearer's right so the mesh seam matches the texture seam.
+      let ang = Math.PI / 2 + (j / segs) * Math.PI * 2;
+      while (ang > Math.PI) ang -= Math.PI * 2;
+      while (ang < -Math.PI) ang += Math.PI * 2;
+      return ang;
+    }
+    for (let i = 0; i <= rings; i++) {
+      const t = i / rings;
+      const y = height * Math.sin(t * Math.PI * 0.5);
+      const k = radK(t);
+      for (let j = 0; j <= segs; j++) {
+        const ang = angOf(j);
+        const fromBack = Math.PI - Math.abs(ang);
+        let yy = y;
+        // A soft opening above the strap. The falloff is smooth so the edge does not spike.
+        const backness = Math.max(0, 1 - fromBack / 0.85);
+        if (backness > 0 && t < 0.22) {
+          const lift = 0.03 * Math.pow(backness, 1.6) * Math.pow(1 - t / 0.22, 1.3);
+          yy += lift;
+        }
+        crownPos.push(Math.sin(ang) * baseRx * k, yy, Math.cos(ang) * baseRz * k);
+        crownUv.push(j / segs, t);
+        const light = 0.78 + 0.22 * (0.55 + 0.45 * Math.max(0, Math.cos(ang) * 0.65 + t * 0.5));
+        crownCol.push(light, light, light);
+      }
+    }
+    const stride = segs + 1;
+    for (let i = 0; i < rings; i++) {
+      for (let j = 0; j < segs; j++) {
+        const a = i * stride + j;
+        const b = a + 1;
+        const c = a + stride;
+        const d = c + 1;
+        crownIdx.push(a, c, b, b, c, d);
+      }
+    }
+    function geo(pos, uv, col, idx) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      if (col) g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }
+    function texOf(img) {
       const tex = new THREE.Texture(img);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = maxAniso;
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.flipY = true;
       tex.needsUpdate = true;
-      const aspect = img.width / Math.max(1, img.height);
-      const geo = new THREE.PlaneGeometry(width, width / aspect);
-      const mat = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        toneMapped: false
-      });
-      mat.userData.capView = true;
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.renderOrder = 2;
-      group.add(mesh);
-      return mesh;
+      return tex;
+    }
+    const cloth = new THREE.MeshBasicMaterial({
+      map: texOf(crownImg),
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      toneMapped: false
     });
-    let top = 0;
-    let bottom = 0;
-    views.forEach(function (mesh) {
-      mesh.geometry.computeBoundingBox();
-      top = Math.max(top, mesh.geometry.boundingBox.max.y);
-      bottom = Math.min(bottom, mesh.geometry.boundingBox.min.y);
+    const billCloth = new THREE.MeshBasicMaterial({
+      map: texOf(billImg),
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      toneMapped: false
     });
-    group.userData.views = views;
-    group.userData.top = top;
-    group.userData.bottom = bottom;
-    group.userData.width = width;
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(geo(crownPos, crownUv, crownCol, crownIdx), cloth));
+
+    // Pre-curved bill, attached only across the front panels.
+    const arc0 = -0.96;
+    const arc1 = 0.96;
+    const bSeg = 28;
+    const bRing = 14;
+    const billPos = [];
+    const billUv = [];
+    const billCol = [];
+    const billIdx = [];
+    function billPoint(f, ang, under) {
+      const narrow = 1 - 0.16 * f;
+      const x = Math.sin(ang) * baseRx * narrow;
+      const along = Math.max(0, Math.cos(ang));
+      const forward = 0.002 + f * 0.112 * (0.45 + 0.55 * along);
+      const z = Math.cos(ang) * baseRz * (1 - 0.05 * f) + forward;
+      const y = 0.012 - f * f * (0.01 + 0.028 * along) - (under ? 0.003 : 0);
+      return [x, y, z];
+    }
+    for (let s = 0; s <= bRing; s++) {
+      const f = s / bRing;
+      for (let i = 0; i <= bSeg; i++) {
+        const ang = arc0 + (arc1 - arc0) * (i / bSeg);
+        const p = billPoint(f, ang, false);
+        billPos.push(p[0], p[1], p[2]);
+        billUv.push(i / bSeg, 1 - f);
+        const shade = 0.9 - 0.18 * f;
+        billCol.push(shade, shade, shade);
+      }
+    }
+    const bStride = bSeg + 1;
+    for (let s = 0; s < bRing; s++) {
+      for (let i = 0; i < bSeg; i++) {
+        const a = s * bStride + i;
+        const b = a + 1;
+        const c = a + bStride;
+        const d = c + 1;
+        billIdx.push(a, b, c, b, d, c);
+      }
+    }
+    // Underside and the thin leading edge, so the bill reads as a brim.
+    const underBase = billPos.length / 3;
+    for (let s = 0; s <= bRing; s++) {
+      const f = s / bRing;
+      for (let i = 0; i <= bSeg; i++) {
+        const ang = arc0 + (arc1 - arc0) * (i / bSeg);
+        const p = billPoint(f, ang, true);
+        billPos.push(p[0], p[1], p[2]);
+        billUv.push(i / bSeg, 1 - f);
+        billCol.push(0.55, 0.55, 0.55);
+      }
+    }
+    for (let s = 0; s < bRing; s++) {
+      for (let i = 0; i < bSeg; i++) {
+        const a = underBase + s * bStride + i;
+        const b = a + 1;
+        const c = a + bStride;
+        const d = c + 1;
+        billIdx.push(a, c, b, b, c, d);
+      }
+    }
+    group.add(new THREE.Mesh(geo(billPos, billUv, billCol, billIdx), billCloth));
+
+    // Strap across the lower back, under the center seam.
+    const strapPos = [];
+    const strapUv = [];
+    const strapCol = [];
+    const strapIdx = [];
+    const sSeg = 16;
+    for (let row = 0; row <= 1; row++) {
+      for (let i = 0; i <= sSeg; i++) {
+        const ang = Math.PI - 0.5 + (i / sSeg) * 1.0;
+        const a = ang > Math.PI ? ang - Math.PI * 2 : ang;
+        const y = row === 0 ? 0.0 : 0.02;
+        strapPos.push(Math.sin(a) * baseRx * 1.012, y, Math.cos(a) * baseRz * 1.012);
+        strapUv.push(i / sSeg, row);
+        strapCol.push(0.72, 0.72, 0.72);
+      }
+    }
+    for (let i = 0; i < sSeg; i++) {
+      strapIdx.push(i, i + 1, i + sSeg + 1, i + 1, i + sSeg + 2, i + sSeg + 1);
+    }
+    group.add(new THREE.Mesh(geo(strapPos, strapUv, strapCol, strapIdx), billCloth));
+
+    const button = new THREE.Mesh(
+      new THREE.SphereGeometry(0.014, 18, 12),
+      new THREE.MeshBasicMaterial({ color: light ? '#f3f3f3' : '#141414', toneMapped: false })
+    );
+    button.scale.set(1, 0.72, 1);
+    button.position.set(0, height + 0.004, 0);
+    group.add(button);
+
+    const box = new THREE.Box3().setFromObject(group);
+    group.userData.top = box.max.y;
+    group.userData.bottom = box.min.y;
+    group.userData.width = box.max.x - box.min.x;
     group.userData.setName = function () {};
     return group;
   }
@@ -653,12 +846,9 @@ function boot() {
     let shells;
     if (spec.sku === 'cap') {
       async function loadSet(color) {
-        const keys = ['front', 'side', 'back', 'three'];
-        const imgs = [];
-        for (let k = 0; k < keys.length; k++) {
-          imgs.push(await loadImage(window.SHOP_BASE + 'assets/gear/cap-photo-' + color + '-' + keys[k] + '.png' + v));
-        }
-        return photoCap(imgs);
+        const crown = await loadImage(window.SHOP_BASE + 'assets/gear/cap-atlas-' + color + '.png' + v);
+        const bill = await loadImage(window.SHOP_BASE + 'assets/gear/cap-bill-' + color + '.png' + v);
+        return makeCap(crown, bill, color === 'white');
       }
       shells = { black: await loadSet('black'), white: await loadSet('white') };
     } else {
@@ -740,32 +930,12 @@ function boot() {
         if (!obj.isMesh || !obj.material) return;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(function (mat) {
-          if (mat.opacity === undefined || mat.userData.capView) return;
+          if (mat.opacity === undefined) return;
           mat.depthTest = true;
           mat.depthWrite = true;
           if (!(mat.alphaTest > 0)) mat.transparent = piece.opacity < 0.98;
           mat.opacity += (piece.opacity - mat.opacity) * 0.2;
         });
-        if (piece.spec.sku === 'cap') {
-          const tau = Math.PI * 2;
-          const yaw = ((piece.rotator.rotation.y % tau) + tau) % tau;
-          ['black', 'white'].forEach(function (key) {
-            const views = piece.shells[key].userData.views;
-            const on = piece.shells[key].visible;
-            const n = views.length;
-            const u = (yaw / tau) * n;
-            const i = Math.floor(u) % n;
-            const f = u - Math.floor(u);
-            views.forEach(function (mesh, k) {
-              mesh.rotation.y = -piece.rotator.rotation.y;
-              let o = 0;
-              if (on && k === i) o = 1 - f;
-              else if (on && k === (i + 1) % n) o = f;
-              mesh.material.opacity = o;
-              mesh.visible = o > 0.02;
-            });
-          });
-        }
       });
     });
   }
@@ -804,7 +974,7 @@ function boot() {
     let contentW = Math.max(0.18, (box.max.x - box.min.x) * 1.16);
     let contentH = Math.max(0.18, (box.max.y - box.min.y) * 1.14);
     if (piece.spec.sku === 'cap') {
-      contentW = Math.max(0.08, (box.max.x - box.min.x) / 0.94);
+      contentW = Math.max(0.08, (box.max.x - box.min.x) / 1.02);
       contentH = Math.max(0.04, (box.max.y - box.min.y) / 0.9);
     }
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);

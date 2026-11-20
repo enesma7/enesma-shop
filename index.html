@@ -14,6 +14,17 @@
   document.write('<link rel="stylesheet" href="' + b + 'css/shop.css?v=' + v + '">');
   document.write('<link rel="icon" href="' + b + 'favicon-32.png" type="image/png">');
   document.write('<link rel="apple-touch-icon" href="' + b + 'apple-touch-icon.png">');
+  var introOn = true;
+  try { introOn = sessionStorage.getItem('enesma_shop_intro_seen') !== '1'; } catch (err) {}
+  if (!introOn && /[?&]intro=(replay|capture)(?:&|$)/.test(location.search)) introOn = true;
+  window.__ESHOP_INTRO = introOn;
+  if (introOn) {
+    document.write('<link rel="stylesheet" href="' + b + 'css/intro.css?v=' + v + '">');
+    document.documentElement.classList.add('eshop-intro-on');
+    setTimeout(function () {
+      if (!document.querySelector('.eshop-intro')) document.documentElement.classList.remove('eshop-intro-on');
+    }, 4000);
+  }
 })();
 </script>
 
@@ -29,6 +40,7 @@ document.write('<script src="' + window.SHOP_BASE + 'js/cart.js?v=20261120p"><\/
 document.write('<script src="' + window.SHOP_BASE + 'js/api.js?v=20261120p"><\/script>');
 document.write('<script src="' + window.SHOP_BASE + 'js/ui.js?v=20261120p"><\/script>');
 document.write('<script src="' + window.SHOP_BASE + 'js/main.js?v=20261120p"><\/script>');
+if (window.__ESHOP_INTRO) document.write('<script src="' + window.SHOP_BASE + 'js/intro.js?v=20261120p"><\/script>');
 </script>
 </body>
 </html>

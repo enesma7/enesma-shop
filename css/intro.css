@@ -1,0 +1,51 @@
+/* Homepage intro overlay. Rocket Black so the shatter, flashes, and edge glow read. */
+html.eshop-intro-on,
+html.eshop-intro-on body {
+  background: #000007;
+  overflow: hidden;
+}
+
+.eshop-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #000007;
+  color: #fbfbfb;
+  touch-action: none;
+}
+
+.eshop-intro-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.eshop-intro-skip {
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 2;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 7, 0.35);
+  color: #fbfbfb;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.eshop-intro-skip:focus-visible {
+  outline: 2px solid #fbfbfb;
+  outline-offset: 3px;
+}
+
+.eshop-intro.is-out {
+  pointer-events: none;
+}

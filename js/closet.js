@@ -99,15 +99,118 @@ function boot() {
     const tex = new THREE.Texture(img);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = maxAniso;
-    tex.generateMipmaps = true;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    // Mipmaps average the white background into the sleeve hem and draw it as a gray shelf.
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.premultiplyAlpha = true;
     tex.needsUpdate = true;
     return tex;
   }
 
+  // The cutouts leave a thin transparent slit under each sleeve. The mesh spans
+  // that slit, then alphaTest opens it into a notch in the side seam. Close only
+  // the short, off-center slits in the sleeve band. Neck and hem stay open.
+  function sealSlits(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = image.data;
+    const w = canvas.width;
+    const h = canvas.height;
+    let minY = h;
+    let maxY = 0;
+    let minX = w;
+    let maxX = 0;
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        if (px[(y * w + x) * 4 + 3] > 140) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    const span = Math.max(1, maxX - minX);
+    const tall = Math.max(1, maxY - minY);
+    const limit = span * 0.12;
+    const y0 = minY + tall * 0.28;
+    const y1 = minY + tall * 0.62;
+    const midX = (minX + maxX) / 2;
+    for (let y = (y0 | 0); y < y1; y++) {
+      const runs = [];
+      let x = 0;
+      while (x < w) {
+        while (x < w && px[(y * w + x) * 4 + 3] <= 140) x++;
+        if (x >= w) break;
+        const start = x;
+        while (x < w && px[(y * w + x) * 4 + 3] > 140) x++;
+        runs.push([start, x - 1]);
+      }
+      for (let i = 0; i < runs.length - 1; i++) {
+        const gapL = runs[i][1] + 1;
+        const gapR = runs[i + 1][0] - 1;
+        const gw = gapR - gapL + 1;
+        if (gw < 2 || gw > limit) continue;
+        if (Math.abs((gapL + gapR) / 2 - midX) < span * 0.18) continue;
+        // The run edge is an anti-aliased fringe, often light gray. Sample
+        // inward so the closed slit matches the cloth, not the fringe.
+        const inset = 12;
+        const leftX = Math.max(runs[i][0], runs[i][1] - inset);
+        const rightX = Math.min(runs[i + 1][1], runs[i + 1][0] + inset);
+        const left = (y * w + leftX) * 4;
+        const right = (y * w + rightX) * 4;
+        for (let fill = gapL; fill <= gapR; fill++) {
+          const t = (fill - gapL) / Math.max(1, gw - 1);
+          const o = (y * w + fill) * 4;
+          px[o] = px[left] * (1 - t) + px[right] * t;
+          px[o + 1] = px[left + 1] * (1 - t) + px[right + 1] * t;
+          px[o + 2] = px[left + 2] * (1 - t) + px[right + 2] * t;
+          px[o + 3] = 255;
+        }
+      }
+    }
+    // The cutout fringe is a light pixel with full alpha. Triangles along the
+    // sleeve hem stretch that one pixel into a gray shelf. Recolor it from cloth.
+    const copy = new Uint8ClampedArray(px);
+    const reach = 2;
+    const take = 14;
+    for (let y = take; y < h - take; y++) {
+      let rowEdge = false;
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        if (copy[(row + x) * 4 + 3] > 140) { rowEdge = true; break; }
+      }
+      if (!rowEdge) continue;
+      for (let x = take; x < w - take; x++) {
+        const o = (row + x) * 4;
+        if (copy[o + 3] <= 140) continue;
+        let edge = false;
+        for (let k = 1; k <= reach && !edge; k++) {
+          if (copy[(row + x + k) * 4 + 3] <= 140 || copy[(row + x - k) * 4 + 3] <= 140) edge = true;
+        }
+        if (!edge) continue;
+        const dir = x < midX ? 1 : -1;
+        const ix = x + dir * take;
+        const io = (row + ix) * 4;
+        if (copy[io + 3] > 140) {
+          px[o] = copy[io];
+          px[o + 1] = copy[io + 1];
+          px[o + 2] = copy[io + 2];
+        }
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas;
+  }
+
   function garmentMesh(frontImg, backImg, spec) {
+    const frontSrc = sealSlits(frontImg);
+    const backSrc = sealSlits(backImg);
     const maxMask = 480;
     const sc = maxMask / Math.max(frontImg.width, frontImg.height);
     const iw = Math.max(8, Math.round(frontImg.width * sc));
@@ -116,8 +219,18 @@ function boot() {
     mask.width = iw;
     mask.height = ih;
     const mctx = mask.getContext('2d', { willReadFrequently: true });
-    mctx.drawImage(frontImg, 0, 0, iw, ih);
-    const data = mctx.getImageData(0, 0, iw, ih).data;
+    mctx.drawImage(frontSrc, 0, 0, iw, ih);
+    const frontPx = mctx.getImageData(0, 0, iw, ih).data;
+    mctx.clearRect(0, 0, iw, ih);
+    mctx.drawImage(backSrc, 0, 0, iw, ih);
+    const backPx = mctx.getImageData(0, 0, iw, ih).data;
+    // Front and back photos are not the same outline. The front sleeve hangs
+    // past the back sleeve, and that extra cloth shows through as a notch
+    // under the cuff. Keep only the pixels that are cloth on both sides.
+    const data = new Uint8ClampedArray(frontPx);
+    for (let i = 3; i < data.length; i += 4) {
+      if (!(frontPx[i] > 140 && backPx[i] > 140)) data[i] = 0;
+    }
     const step = 2;
     const samples = [];
     let minY = ih;
@@ -154,6 +267,28 @@ function boot() {
     }
     despike('l');
     despike('r');
+    // A sleeve hem can fall between two samples and become one long triangle.
+    // That triangle stretches the gray edge into a shelf. Step the edge across.
+    const eased = [samples[0]];
+    for (let i = 1; i < samples.length; i++) {
+      const prev = eased[eased.length - 1];
+      const next = samples[i];
+      const jump = Math.max(Math.abs(next.l - prev.l), Math.abs(next.r - prev.r));
+      if (jump > 6) {
+        const parts = Math.ceil(jump / 4);
+        for (let k = 1; k < parts; k++) {
+          const t = k / parts;
+          eased.push({
+            y: prev.y + (next.y - prev.y) * t,
+            l: prev.l + (next.l - prev.l) * t,
+            r: prev.r + (next.r - prev.r) * t
+          });
+        }
+      }
+      eased.push(next);
+    }
+    samples.length = 0;
+    eased.forEach(function (row) { samples.push(row); });
     let centerSum = 0;
     samples.forEach(function (s) { centerSum += (s.l + s.r) / 2; });
     const center = centerSum / Math.max(1, samples.length);
@@ -248,6 +383,9 @@ function boot() {
       const dy = b.y - a.y;
       const span = Math.hypot(dx, dy);
       if (span < 0.0004) return;
+      // A steep sleeve hem is already covered by the front and back grids.
+      // A lip across that jump sticks out as a break in the side seam.
+      if (!force && Math.abs(dx) > Math.abs(dy) * 3 && Math.abs(dx) > 0.012) return;
       const segs = Math.max(4, Math.ceil(span / 0.02));
       const rings = [[], []];
       [a, b].forEach(function (p, pi) {
@@ -303,13 +441,13 @@ function boot() {
       return g;
     }
     const frontMat = new THREE.MeshBasicMaterial({
-      map: makeTex(frontImg),
+      map: makeTex(frontSrc),
       alphaTest: 0.5,
       premultipliedAlpha: true,
       side: THREE.DoubleSide
     });
     const backMat = new THREE.MeshBasicMaterial({
-      map: makeTex(backImg),
+      map: makeTex(backSrc),
       alphaTest: 0.5,
       premultipliedAlpha: true,
       side: THREE.DoubleSide

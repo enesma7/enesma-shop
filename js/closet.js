@@ -9,7 +9,7 @@ const SPECS = [
   { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false, bulge: 0.05, thick: 0.006 },
   { sku: 'polo', hang: 'polo', tall: 1.02, shelf: false, bulge: 0.046, thick: 0.006 },
   { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false, bulge: 0.046, thick: 0.006 },
-  { sku: 'cap', hang: 'cap', tall: 0.24, shelf: true, bulge: 0.018, thick: 0.014, angle: 0 }
+  { sku: 'cap', hang: 'cap', tall: 0.16, shelf: true, bulge: 0, thick: 0, angle: 0.62 }
 ];
 
 const RAIL_Y = 0.36;
@@ -313,10 +313,19 @@ function boot() {
     });
     frontMat.toneMapped = false;
     backMat.toneMapped = false;
+    frontMat.depthTest = true;
+    backMat.depthTest = true;
+    frontMat.depthWrite = true;
+    backMat.depthWrite = true;
+    frontMat.transparent = false;
+    backMat.transparent = false;
     const edgeMat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
-      toneMapped: false
+      toneMapped: false,
+      depthTest: true,
+      depthWrite: true,
+      transparent: false
     });
     const group = new THREE.Group();
     const frontMesh = new THREE.Mesh(geo(frontPos, frontUv, frontIdx), frontMat);
@@ -334,7 +343,7 @@ function boot() {
     return group;
   }
 
-  function makeHanger(barHalf) {
+  function makeHanger(shell) {
     const g = new THREE.Group();
     const metal = gold.clone();
     metal.color.set('#e8d4a4');
@@ -342,31 +351,327 @@ function boot() {
     metal.metalness = 1;
     metal.clearcoat = 0.9;
     metal.clearcoatRoughness = 0.12;
-    const r = 0.005;
+    metal.depthTest = true;
+    metal.depthWrite = true;
+    metal.transparent = false;
+    metal.side = THREE.FrontSide;
+    // About 45% of the previous 0.005 hook radius, so the bar fits inside the shell.
+    const r = 0.00225;
+    const rBar = r * 0.72;
     const railZ = 0.02;
     const around = 0.012 + r;
+    const yShift = shell.position.y;
+    const frontAttr = shell.children[0].geometry.attributes.position;
+    const backAttr = shell.children[1].geometry.attributes.position;
+    function nearestZ(attr, x, y) {
+      let bestD = 1e9;
+      let z = 0;
+      for (let i = 0; i < attr.count; i += 3) {
+        const dx = attr.getX(i) - x;
+        const dy = attr.getY(i) - y;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; z = attr.getZ(i); }
+      }
+      return z;
+    }
+    function insideZ(x, yRot) {
+      const y = yRot - yShift;
+      const zf = nearestZ(frontAttr, x, y);
+      const zb = nearestZ(backAttr, x, y);
+      const lo = Math.min(zf, zb);
+      const hi = Math.max(zf, zb);
+      const mid = (zf + zb) * 0.5;
+      return Math.min(hi - rBar - 0.0003, Math.max(lo + rBar + 0.0003, mid));
+    }
     const hook = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -0.075, 0.012),
-      new THREE.Vector3(0, -0.01, railZ + around),
-      new THREE.Vector3(0, around + 0.002, railZ),
-      new THREE.Vector3(0, around * 0.15, railZ - around),
-      new THREE.Vector3(0, -0.03, railZ - around * 0.72)
+      new THREE.Vector3(0, -0.055, insideZ(0, -0.055)),
+      new THREE.Vector3(0, -0.028, insideZ(0, -0.028)),
+      new THREE.Vector3(0, -0.012, insideZ(0, -0.012)),
+      new THREE.Vector3(0, 0.002, railZ),
+      new THREE.Vector3(0, around + 0.001, railZ),
+      new THREE.Vector3(0, around * 0.2, railZ - around),
+      new THREE.Vector3(0, -0.02, railZ - around * 0.55)
     ]);
-    const barW = Math.max(0.15, Math.min(0.32, barHalf));
-    const bar = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-barW, -0.15, 0.004),
-      new THREE.Vector3(-barW * 0.46, -0.07, 0.01),
-      new THREE.Vector3(0, -0.042, 0.014),
-      new THREE.Vector3(barW * 0.46, -0.07, 0.01),
-      new THREE.Vector3(barW, -0.15, 0.004)
-    ]);
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(hook, 56, r, 14, false), metal));
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(bar, 48, r * 0.82, 12, false), metal));
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r * 0.7, 0.038, 12), metal);
-    neck.position.set(0, -0.058, 0.013);
-    g.add(neck);
-    g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
+    const half = Math.min(0.15, (shell.userData.width || 0.56) * 0.2);
+    const barPts = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      const x = -half + half * 2 * t;
+      const y = -0.05 - 0.085 * Math.pow(Math.abs(t - 0.5) * 2, 1.55);
+      barPts.push(new THREE.Vector3(x, y, insideZ(x, y)));
+    }
+    const bar = new THREE.CatmullRomCurve3(barPts);
+    const hookMesh = new THREE.Mesh(new THREE.TubeGeometry(hook, 64, r, 10, false), metal);
+    const barMesh = new THREE.Mesh(new THREE.TubeGeometry(bar, 48, rBar, 8, false), metal);
+    hookMesh.renderOrder = 0;
+    barMesh.renderOrder = 0;
+    g.add(hookMesh, barMesh);
+    g.traverse(function (obj) {
+      if (!obj.isMesh) return;
+      obj.castShadow = false;
+      obj.material.depthTest = true;
+      obj.material.depthWrite = true;
+      obj.material.transparent = false;
+    });
     return g;
+  }
+
+  function buildCap(white, logoImg, emblemImg) {
+    const R = 0.092;
+    const H = 0.086;
+    const group = new THREE.Group();
+    const cloth = new THREE.MeshPhysicalMaterial({
+      color: white ? '#f3f1ec' : '#1c1d21',
+      roughness: white ? 0.7 : 0.52,
+      metalness: 0,
+      sheen: white ? 0.16 : 0.5,
+      sheenRoughness: 0.4,
+      sheenColor: new THREE.Color(white ? '#ffffff' : '#a0a0a8'),
+      depthTest: true,
+      depthWrite: true,
+      transparent: false,
+      side: THREE.FrontSide
+    });
+    const seamMat = new THREE.MeshStandardMaterial({
+      color: white ? '#b9b6ae' : '#0c0c0e',
+      roughness: 0.72,
+      metalness: 0,
+      depthTest: true,
+      depthWrite: true,
+      transparent: false
+    });
+    function dome(t, a, inset) {
+      const y = H * Math.sin(t * Math.PI * 0.5);
+      const rad = R * Math.cos(t * Math.PI * 0.5) * (inset || 1);
+      return new THREE.Vector3(Math.sin(a) * rad, y, Math.cos(a) * rad);
+    }
+    function gridGeom(nu, nv, sample, flip) {
+      const pos = [];
+      const uv = [];
+      const idx = [];
+      for (let j = 0; j <= nv; j++) {
+        for (let i = 0; i <= nu; i++) {
+          const p = sample(i / nu, j / nv);
+          pos.push(p.x, p.y, p.z);
+          uv.push(i / nu, j / nv);
+        }
+      }
+      const row = nu + 1;
+      for (let j = 0; j < nv; j++) {
+        for (let i = 0; i < nu; i++) {
+          const a = j * row + i;
+          const b = a + 1;
+          const c = a + row;
+          const d = c + 1;
+          if (flip) idx.push(a, c, b, b, c, d);
+          else idx.push(a, b, c, b, d, c);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }
+    function addMesh(geom, mat, order) {
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.renderOrder = order || 0;
+      group.add(mesh);
+      return mesh;
+    }
+    const panels = 6;
+    for (let p = 0; p < panels; p++) {
+      const a0 = p * (Math.PI * 2 / panels);
+      const a1 = (p + 1) * (Math.PI * 2 / panels);
+      addMesh(gridGeom(7, 18, function (u, v) {
+        const edge = Math.min(u, 1 - u);
+        const groove = 1 - 0.018 * Math.exp(-Math.pow(edge / 0.16, 2));
+        const a = a0 + (a1 - a0) * u;
+        const back = -Math.cos(a);
+        const open = back > 0.25 ? Math.pow((back - 0.25) / 0.75, 1.4) * 0.2 : 0;
+        const t = open + (1 - open) * v;
+        return dome(t, a, groove);
+      }), cloth, 0);
+      const seamOpen = (-Math.cos(a0) > 0.25) ? Math.pow((-Math.cos(a0) - 0.25) / 0.75, 1.4) * 0.2 : 0;
+      const seam = new THREE.CatmullRomCurve3([0, 0.2, 0.45, 0.7, 0.88, 1].map(function (t) {
+        return dome(seamOpen + (1 - seamOpen) * t, a0, 1.002);
+      }));
+      addMesh(new THREE.TubeGeometry(seam, 28, 0.00105, 5, false), seamMat, 1);
+    }
+    addMesh(gridGeom(16, 8, function (u, v) {
+      const b = v * Math.PI * 0.5;
+      const a = u * Math.PI * 2;
+      const rad = 0.011 * Math.cos(b);
+      return new THREE.Vector3(Math.cos(a) * rad, H + Math.sin(b) * 0.0075, Math.sin(a) * rad);
+    }), cloth, 0);
+
+    function billPoint(u, v, lift) {
+      const spread = 0.78;
+      const a = (u - 0.5) * 2 * spread;
+      const dist = R * 0.9 + v * 0.07;
+      const arch = Math.cos((u - 0.5) * Math.PI) * 0.007 * (0.25 + v);
+      const drop = v * v * 0.024;
+      return new THREE.Vector3(
+        Math.sin(a) * dist,
+        0.014 + arch - drop + lift,
+        Math.cos(a) * dist
+      );
+    }
+    const surfaces = [
+      { nu: 28, nv: 12, flip: true, sample: function (u, v) { return billPoint(u, v, 0.0042); } },
+      { nu: 28, nv: 12, flip: false, sample: function (u, v) { return billPoint(u, v, 0); } }
+    ];
+    const bPos = [];
+    const bUv = [];
+    const bIdx = [];
+    surfaces.forEach(function (s) {
+      const start = bPos.length / 3;
+      for (let j = 0; j <= s.nv; j++) {
+        for (let i = 0; i <= s.nu; i++) {
+          const p = s.sample(i / s.nu, j / s.nv);
+          bPos.push(p.x, p.y, p.z);
+          bUv.push(i / s.nu, j / s.nv);
+        }
+      }
+      const row = s.nu + 1;
+      for (let j = 0; j < s.nv; j++) {
+        for (let i = 0; i < s.nu; i++) {
+          const a = start + j * row + i;
+          const b = a + 1;
+          const c = a + row;
+          const d = c + 1;
+          if (s.flip) bIdx.push(a, b, c, b, d, c);
+          else bIdx.push(a, c, b, b, c, d);
+        }
+      }
+    });
+    const rimStart = bPos.length / 3;
+    const rimN = 28;
+    for (let i = 0; i <= rimN; i++) {
+      const top = billPoint(i / rimN, 1, 0.0034);
+      const bot = billPoint(i / rimN, 1, 0);
+      bPos.push(top.x, top.y, top.z, bot.x, bot.y, bot.z);
+      bUv.push(i / rimN, 1, i / rimN, 1);
+    }
+    for (let i = 0; i < rimN; i++) {
+      const a = rimStart + i * 2;
+      const b = a + 1;
+      const c = a + 2;
+      const d = a + 3;
+      bIdx.push(a, b, c, c, b, d);
+    }
+    const billGeo = new THREE.BufferGeometry();
+    billGeo.setAttribute('position', new THREE.Float32BufferAttribute(bPos, 3));
+    billGeo.setAttribute('uv', new THREE.Float32BufferAttribute(bUv, 2));
+    billGeo.setIndex(bIdx);
+    billGeo.computeVertexNormals();
+    addMesh(billGeo, cloth, 0);
+
+    function curvedPatch(cx, cy, halfA, halfY, tex) {
+      const geom = gridGeom(18, 6, function (u, v) {
+        const a = cx + (u - 0.5) * 2 * halfA;
+        const y = cy + (v - 0.5) * 2 * halfY;
+        const t = Math.asin(Math.max(-1, Math.min(1, y / H))) / (Math.PI * 0.5);
+        const p = dome(Math.max(0, Math.min(0.96, t)), a, 1);
+        const n = new THREE.Vector3(p.x / (R * R), p.y / (H * H), p.z / (R * R)).normalize();
+        return p.add(n.multiplyScalar(0.0014));
+      });
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        alphaTest: 0.35,
+        depthTest: true,
+        depthWrite: true,
+        transparent: false,
+        side: THREE.FrontSide,
+        toneMapped: false
+      });
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = -2;
+      mat.polygonOffsetUnits = -2;
+      return addMesh(geom, mat, 2);
+    }
+    function imageTexture(img) {
+      const tex = new THREE.Texture(img);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = maxAniso;
+      tex.needsUpdate = true;
+      return tex;
+    }
+    const yLogo = 0.033;
+    const radLogo = R * Math.cos(Math.asin(Math.min(1, yLogo / H)));
+    const logoW = 0.07;
+    curvedPatch(0, yLogo, (logoW * 0.5) / radLogo, (logoW / 4.21) * 0.5, imageTexture(logoImg));
+    const yEmb = 0.05;
+    const radEmb = R * Math.cos(Math.asin(Math.min(1, yEmb / H)));
+    const emb = 0.028;
+    curvedPatch(Math.PI, yEmb, (emb * 0.5) / radEmb, emb * 0.5, imageTexture(emblemImg));
+
+    const nameMesh = { current: null };
+    function paintName(text) {
+      if (nameMesh.current) {
+        group.remove(nameMesh.current);
+        if (nameMesh.current.material.map) nameMesh.current.material.map.dispose();
+        nameMesh.current.material.dispose();
+        nameMesh.current.geometry.dispose();
+        nameMesh.current = null;
+      }
+      const label = String(text || '').trim();
+      if (!label) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = white ? '#1a1a1c' : '#f6f3ec';
+      ctx.font = '600 148px Inter, Helvetica, Arial, sans-serif';
+      ctx.textBaseline = 'middle';
+      const chars = label.toUpperCase().split('');
+      const gap = 14;
+      const widths = chars.map(function (ch) { return ctx.measureText(ch).width; });
+      const total = widths.reduce(function (s, w) { return s + w; }, 0) + gap * Math.max(0, chars.length - 1);
+      const fit = Math.min(1, (canvas.width * 0.84) / total);
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(fit, 1);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      let x = (canvas.width - total) / 2;
+      chars.forEach(function (ch, i) {
+        ctx.fillText(ch, x, canvas.height / 2 + 6);
+        x += widths[i] + gap;
+      });
+      ctx.restore();
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = maxAniso;
+      const yName = 0.037;
+      const radName = R * Math.cos(Math.asin(Math.min(1, yName / H)));
+      const nameW = 0.036;
+      const nameH = 0.0095;
+      nameMesh.current = curvedPatch(Math.PI / 2, yName, (nameW * 0.5) / radName, nameH * 0.5, tex);
+    }
+    paintName('AGENT NAME');
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { paintName(group.userData.nameText || 'AGENT NAME'); });
+    }
+    group.userData.setName = function (text) {
+      group.userData.nameText = text || 'AGENT NAME';
+      paintName(group.userData.nameText);
+    };
+
+    const strap = new THREE.CatmullRomCurve3([-0.7, -0.25, 0.25, 0.7].map(function (u) {
+      const a = Math.PI + u * 0.42;
+      return new THREE.Vector3(Math.sin(a) * R * 0.86, 0.012, Math.cos(a) * R * 0.86);
+    }));
+    addMesh(new THREE.TubeGeometry(strap, 12, 0.0032, 6, false), seamMat, 1);
+
+    const box = new THREE.Box3().setFromObject(group);
+    group.userData.top = box.max.y;
+    group.userData.bottom = box.min.y;
+    group.userData.width = box.max.x - box.min.x;
+    return group;
   }
 
   function softShadow(w, h) {
@@ -422,36 +727,46 @@ function boot() {
   const capX = rackCenter;
 
   Promise.all(SPECS.map(async function (spec, index) {
-    const colors = {};
-    for (const color of ['black', 'white']) {
-      const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
-      const v = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) ? ('?v=' + window.ENESMA_SHOP.ASSET) : '';
-      colors[color] = {
-        front: await loadImage(base + '-front.png' + v),
-        back: await loadImage(base + '-back.png' + v)
+    const v = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) ? ('?v=' + window.ENESMA_SHOP.ASSET) : '';
+    let shells;
+    if (spec.sku === 'cap') {
+      const logoW = await loadImage(window.SHOP_BASE + 'assets/logo/wordmark-white.png' + v);
+      const logoB = await loadImage(window.SHOP_BASE + 'assets/logo/wordmark-black.png' + v);
+      const embW = await loadImage(window.SHOP_BASE + 'assets/logo/emblem-white.png' + v);
+      const embB = await loadImage(window.SHOP_BASE + 'assets/logo/emblem-black.png' + v);
+      shells = {
+        black: buildCap(false, logoW, embW),
+        white: buildCap(true, logoB, embB)
+      };
+    } else {
+      const colors = {};
+      for (const color of ['black', 'white']) {
+        const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
+        colors[color] = {
+          front: await loadImage(base + '-front.png' + v),
+          back: await loadImage(base + '-back.png' + v)
+        };
+      }
+      shells = {
+        black: garmentMesh(colors.black.front, colors.black.back, spec),
+        white: garmentMesh(colors.white.front, colors.white.back, spec)
       };
     }
-    const shells = {
-      black: garmentMesh(colors.black.front, colors.black.back, spec),
-      white: garmentMesh(colors.white.front, colors.white.back, spec)
-    };
     shells.white.visible = false;
     const rotator = new THREE.Group();
     rotator.add(shells.black, shells.white);
-    if (!spec.shelf) rotator.add(makeHanger((shells.black.userData.width || 0.7) * 0.2));
     const holder = new THREE.Group();
     if (spec.shelf) {
-      const drop = -shells.black.userData.bottom - 0.012;
+      const drop = -shells.black.userData.bottom;
       shells.black.position.y = drop;
-      shells.white.position.y = -shells.white.userData.bottom - 0.012;
-      holder.position.set(capX, shelfY + shelfT / 2 + 0.001, shelfZ + shelfD * 0.12);
-      if (spec.angle) {
-        rotator.rotation.y = spec.angle;
-      }
+      shells.white.position.y = -shells.white.userData.bottom;
+      holder.position.set(capX, shelfY + shelfT / 2 + 0.001, shelfZ + shelfD * 0.08);
+      if (spec.angle) rotator.rotation.y = spec.angle;
     } else {
       const neck = -0.01;
       shells.black.position.y = neck - shells.black.userData.top;
       shells.white.position.y = neck - shells.white.userData.top;
+      rotator.add(makeHanger(shells.black));
       holder.position.set(index * SPACING, RAIL_Y, 0);
     }
     holder.add(rotator);
@@ -503,7 +818,9 @@ function boot() {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(function (mat) {
           if (mat.opacity === undefined) return;
-          mat.transparent = piece.opacity < 0.98;
+          mat.depthTest = true;
+          mat.depthWrite = true;
+          if (!(mat.alphaTest > 0)) mat.transparent = piece.opacity < 0.98;
           mat.opacity += (piece.opacity - mat.opacity) * 0.2;
         });
       });
@@ -541,16 +858,21 @@ function boot() {
     const width = Math.max(1, stage.clientWidth);
     const cssH = Math.max(320, Math.round(Math.min(window.innerHeight * 0.58, 520)));
     stage.style.height = cssH + 'px';
-    const contentW = Math.max(0.18, (box.max.x - box.min.x) * 1.16);
-    const contentH = Math.max(0.18, (box.max.y - box.min.y) * 1.14);
+    let contentW = Math.max(0.18, (box.max.x - box.min.x) * 1.16);
+    let contentH = Math.max(0.18, (box.max.y - box.min.y) * 1.14);
+    if (piece.spec.sku === 'cap') {
+      contentW = Math.max(0.08, (box.max.x - box.min.x) / 0.85);
+      contentH = Math.max(0.08, (box.max.y - box.min.y) / 0.78);
+    }
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
     camera.aspect = width / cssH;
     const zW = (contentW / camera.aspect) / (2 * half);
     const zH = contentH / (2 * half);
-    const zFit = Math.max(zW, zH, 1.4);
+    const zFit = Math.max(zW, zH, piece.spec.sku === 'cap' ? 0.3 : 1.4);
     const cx = (box.min.x + box.max.x) / 2;
     const cy = (box.min.y + box.max.y) / 2;
-    camera.position.set(cx, cy, zFit);
+    const pitch = piece.camPitch || 0;
+    camera.position.set(cx, cy + Math.sin(pitch) * zFit, Math.cos(pitch) * zFit);
     camera.lookAt(cx, cy, 0);
     camera.updateProjectionMatrix();
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -651,10 +973,19 @@ function boot() {
     sheet.querySelectorAll('[data-size]').forEach(function (btn) {
       btn.onclick = function () { colorState.size = btn.getAttribute('data-size'); drawSheet(); };
     });
+    function applyCapName() {
+      const label = colorState.agentName && String(colorState.agentNameText || '').trim()
+        ? colorState.agentNameText
+        : 'AGENT NAME';
+      ['black', 'white'].forEach(function (key) {
+        const shell = active && active.shells[key];
+        if (shell && shell.userData.setName) shell.userData.setName(label);
+      });
+    }
     const nameBox = document.getElementById('cName');
-    if (nameBox) nameBox.onchange = function () { colorState.agentName = nameBox.checked; drawSheet(); };
+    if (nameBox) nameBox.onchange = function () { colorState.agentName = nameBox.checked; applyCapName(); drawSheet(); };
     const nameText = document.getElementById('cNameText');
-    if (nameText) nameText.oninput = function () { colorState.agentNameText = nameText.value; };
+    if (nameText) nameText.oninput = function () { colorState.agentNameText = nameText.value; applyCapName(); };
     document.getElementById('backCloset').onclick = leave;
     document.getElementById('addCloset').onclick = function () {
       Cart.add(product.id, {

@@ -135,6 +135,95 @@ def build(color_white):
     return views
 
 
+def fabric_tile(src, white):
+    im = Image.open(src).convert("RGB")
+    # A clean patch of the black mesh, away from seams and the bill.
+    patch = im.crop((620, 360, 980, 720)).resize((512, 512), Image.Resampling.LANCZOS)
+    arr = np.array(patch).astype(np.float32)
+    if white:
+        # Keep the mesh grain, lift it to a white cap.
+        lum = arr.mean(axis=2, keepdims=True) / 255.0
+        arr = np.clip(214 + lum * 28, 0, 255)
+        arr = np.repeat(arr, 3, axis=2)
+    else:
+        # Hold the cloth in the same black the SanMar photo uses.
+        arr = np.clip(arr * 0.92, 0, 255)
+    tile = Image.fromarray(arr.astype(np.uint8), "RGB").convert("RGBA")
+    return tile
+
+
+def paint_seams(draw, w, h):
+    # Six panel seams in the same u space as the mesh.
+    # u = ((ang + pi) / (2*pi) + 0.25) % 1, ang 0 at the front.
+    seams = (0.75, 0.917, 0.583, 0.083, 0.417, 0.25)
+    for u in seams:
+        x = int(round(u * w))
+        draw.line([(x, 0), (x, h)], fill=(18, 18, 20, 150), width=3)
+
+
+def build_atlases():
+    side = os.path.join(OUT, "cap-photo-black-side.png")
+    os.makedirs(OUT, exist_ok=True)
+    W, H = 2048, 1024
+    for white, name, word_path, emb_path, ink in (
+        (False, "black", WORD_W, EMB_W, (251, 251, 251, 255)),
+        (True, "white", WORD_B, EMB_B, (20, 20, 22, 255)),
+    ):
+        tile = fabric_tile(side, white)
+        atlas = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+        for y in range(0, H, 512):
+            for x in range(0, W, 512):
+                atlas.paste(tile, (x, y))
+        draw = ImageDraw.Draw(atlas, "RGBA")
+        # Sweatband, slightly deeper than the crown cloth.
+        band_h = int(H * 0.055)
+        shade = (28, 28, 30, 180) if not white else (186, 186, 188, 150)
+        draw.rectangle([0, H - band_h, W, H], fill=shade)
+        paint_seams(draw, W, H)
+        # Eyelets on the side panels, mid crown.
+        for u in (0.50, 0.00):
+            cx, cy = int(u * W) % W, int(H * (1 - 0.62))
+            r = 11
+            hole = (12, 12, 14, 255) if not white else (70, 70, 72, 255)
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=hole)
+
+        word = Image.open(word_path).convert("RGBA")
+        # Both front panels. Front center is u=0.75.
+        lw = int(W * 0.24)
+        ratio = word.height / word.width
+        mark = embroider(curve_logo(word.resize((lw, max(1, int(lw * ratio))), Image.Resampling.LANCZOS), 0.16))
+        paste(atlas, mark, (int(W * 0.75 - mark.width / 2), int(H * (1 - 0.64) - mark.height / 2)))
+
+        # Rear of the wearer's left side panel, just above the sweatband.
+        # That panel is u 0.417 (rear seam) to 0.583. Keep the name short and
+        # against the rear seam so it does not run toward the bill.
+        label = embroider(tracked("AGENT NAME", 20, ink))
+        paste(atlas, label, (int(W * 0.438), int(H * (1 - 0.09) - label.height / 2)))
+        print("name", name, label.size)
+
+        emblem = Image.open(emb_path).convert("RGBA")
+        ew = int(W * 0.038)
+        eh = int(ew * emblem.height / emblem.width)
+        emb = embroider(emblem.resize((ew, eh), Image.Resampling.LANCZOS))
+        # Center back seam is u=0.25, directly above the strap opening.
+        paste(atlas, emb, (int(W * 0.25 - emb.width / 2), int(H * (1 - 0.20) - emb.height / 2)))
+
+        path = os.path.join(OUT, "cap-atlas-%s.png" % name)
+        atlas.convert("RGB").save(path, "PNG", optimize=True)
+        print(path, atlas.size)
+
+        bill = Image.new("RGBA", (1024, 512), (0, 0, 0, 255))
+        for y in range(0, 512, 512):
+            bill.paste(tile.resize((1024, 512), Image.Resampling.LANCZOS), (0, y))
+        bdraw = ImageDraw.Draw(bill, "RGBA")
+        stitch = (24, 24, 26, 200) if not white else (170, 170, 172, 180)
+        for i, yy in enumerate((70, 150, 250, 360)):
+            bdraw.arc([40, yy - 30, 980, yy + 80], 200, 340, fill=stitch, width=3)
+        bpath = os.path.join(OUT, "cap-bill-%s.png" % name)
+        bill.convert("RGB").save(bpath, "PNG", optimize=True)
+        print(bpath, bill.size)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for white, name in ((False, "black"), (True, "white")):

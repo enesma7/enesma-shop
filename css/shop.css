@@ -254,4 +254,10 @@ h1, h2, h3, p { text-wrap: pretty; }
 @media (max-width: 759px) {
   .drawer { width: 100%; }
   .closet-headline { top: auto; bottom: 18px; font-size: 28px; text-shadow: 0 1px 0 #f4f2ee; }
+  .closet.detail { flex-direction: column; }
+  .closet.detail .stage { height: 54vh; min-height: 320px; flex: none; }
+  .closet.detail .sheet {
+    position: relative; inset: auto; width: 100%; height: auto; max-height: 46vh;
+    box-shadow: none;
+  }
 }

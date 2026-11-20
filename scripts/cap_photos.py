@@ -70,10 +70,10 @@ def embroider(mark):
     return base.filter(ImageFilter.SMOOTH)
 
 
-def tracked(text, size, fill):
+def tracked(text, size, fill, tracking=0.12):
     font = ImageFont.truetype(FONT, size)
     chars = list(text.upper())
-    gap = int(size * 0.12)
+    gap = max(1, int(size * tracking))
     widths = []
     dummy = ImageDraw.Draw(Image.new("RGB", (4, 4)))
     for ch in chars:
@@ -109,8 +109,11 @@ def follow_band(mark, alpha, x0, gap=14):
     for i in range(mw):
         x = min(w - 1, max(0, x0 + i))
         col = np.where(alpha[:, x] > 40)[0]
-        dest[i] = col.max() if len(col) else 0
-    dest = np.convolve(dest, np.ones(31) / 31, mode="same")
+        dest[i] = col.max() if len(col) else dest[i - 1] if i else 0
+    # Pad with the end values. A zero-padded blur yanks the first and last
+    # columns up the crown and leaves a dashed streak.
+    pad = 15
+    dest = np.convolve(np.pad(dest, pad, mode="edge"), np.ones(31) / 31, mode="valid")
     shift = dest - gap - baseline
     y0 = int(np.floor(shift.min())) - 2
     y1 = int(np.ceil(shift.max())) + mh + 2
@@ -259,9 +262,9 @@ def build(color_white):
             mark, center = crown_word(word, int(w * 0.31), "right", -0.06)
             paste(im, mark, (1035 - center[0], 530 - center[1]))
             # Same small size, bent onto the sweatband. The rear end rises with the edge.
-            label = embroider(tracked("AGENT NAME", max(22, int(h * 0.032)), ink))
-            x0 = int(w * 0.028)
-            label, y0 = follow_band(label, np.array(im)[:, :, 3], x0, gap=28)
+            label = embroider(tracked("AGENT NAME", max(22, int(h * 0.032)), ink, tracking=0.05))
+            x0 = int(w * 0.022)
+            label, y0 = follow_band(label, np.array(im)[:, :, 3], x0, gap=26)
             paste(im, label, (x0, y0))
         elif key == "three":
             # The other 3/4, bill to the left. The left end is the far end.

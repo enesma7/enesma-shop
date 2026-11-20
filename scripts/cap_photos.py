@@ -94,6 +94,43 @@ def paste(base, mark, xy):
     base.alpha_composite(mark, (int(xy[0]), int(xy[1])))
 
 
+def follow_band(mark, alpha, x0, gap=14):
+    """Drop a mark onto the crown's lower edge so it arcs with the sweatband.
+
+    The rear (left) end sits higher, matching the edge as it rises toward the back.
+    """
+    arr = np.array(mark.convert("RGBA"))
+    mh, mw = arr.shape[:2]
+    h, w = alpha.shape
+    # One baseline for the whole word, so letters move together instead of tearing.
+    ink = np.where(arr[:, :, 3] > 12)[0]
+    baseline = float(ink.max()) if len(ink) else mh - 1
+    dest = np.zeros(mw, np.float32)
+    for i in range(mw):
+        x = min(w - 1, max(0, x0 + i))
+        col = np.where(alpha[:, x] > 40)[0]
+        dest[i] = col.max() if len(col) else 0
+    dest = np.convolve(dest, np.ones(31) / 31, mode="same")
+    shift = dest - gap - baseline
+    y0 = int(np.floor(shift.min())) - 2
+    y1 = int(np.ceil(shift.max())) + mh + 2
+    out_h = y1 - y0
+    out = np.zeros((out_h, mw, 4), np.float32)
+    rows = np.arange(out_h)
+    for i in range(mw):
+        # Output row 0 is destination y `y0`, so the ink bottom lands on the band.
+        src = rows + y0 - shift[i]
+        good = (src >= 0) & (src < mh - 1)
+        if not good.any():
+            continue
+        s0 = np.floor(src).astype(np.int32)
+        s1 = np.minimum(s0 + 1, mh - 1)
+        t = (src - s0)[:, None]
+        sample = (1 - t) * arr[np.clip(s0, 0, mh - 1), i] + t * arr[np.clip(s1, 0, mh - 1), i]
+        out[good, i] = sample[good]
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA"), int(y0)
+
+
 def foreshorten(mark, squeeze=0.72, near="right"):
     """Compress one side of a mark so it sits on a turned panel without tearing the letters."""
     arr = np.array(mark.convert("RGBA"))
@@ -221,19 +258,25 @@ def build(color_white):
             # around the crown. Center of the mark is the front seam.
             mark, center = crown_word(word, int(w * 0.31), "right", -0.06)
             paste(im, mark, (1035 - center[0], 530 - center[1]))
+            # Same small size, bent onto the sweatband. The rear end rises with the edge.
             label = embroider(tracked("AGENT NAME", max(22, int(h * 0.032)), ink))
-            label = label.rotate(-3, expand=True, resample=Image.Resampling.BICUBIC)
-            paste(im, label, (int(w * 0.08), int(h * 0.66)))
+            x0 = int(w * 0.028)
+            label, y0 = follow_band(label, np.array(im)[:, :, 3], x0, gap=28)
+            paste(im, label, (x0, y0))
         elif key == "three":
             # The other 3/4, bill to the left. The left end is the far end.
             mark, center = crown_word(word, int(w * 0.31), "left", 0.05)
             paste(im, mark, (668 - center[0], 530 - center[1]))
         elif key == "back":
-            # Center seam just above the strap opening on the real rear photo.
-            ew = int(w * 0.068)
+            # On the center seam, one third of the way from the strap arch up
+            # toward the button. About twice the old mark, turned with the panel.
+            ew = 400
             eh = int(ew * emblem.height / max(1, emblem.width))
-            mark = embroider(emblem.resize((ew, eh), Image.Resampling.LANCZOS))
-            paste(im, mark, (int(w * 0.25) - mark.width // 2, int(h * 0.58) - mark.height // 2))
+            mark = emblem.resize((ew, eh), Image.Resampling.LANCZOS)
+            mark = mark.resize((int(ew * 0.86), eh), Image.Resampling.LANCZOS)
+            mark = embroider(mark)
+            mark = mark.rotate(-23, expand=True, resample=Image.Resampling.BICUBIC)
+            paste(im, mark, (408 - mark.width // 2, 525 - mark.height // 2))
         views[key] = im
     return views
 

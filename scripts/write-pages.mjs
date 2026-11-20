@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const asset = '20261120o';
+const asset = '20261120p';
 const pages = [
   { out: 'index.html', title: 'ENESMA Shop', page: 'home' },
   { out: 'gear/index.html', title: 'Gear · ENESMA Shop', page: 'closet', importMap: true },

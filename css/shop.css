@@ -193,7 +193,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #f4f2ee; color: #141418; }
 .stage { position: relative; height: 70vh; min-height: 420px; background: #f4f2ee; }
 .closet-headline {
-  position: absolute; z-index: 2; left: 22px; top: 16%; max-width: 11ch;
+  position: absolute; z-index: 2; left: 22px; top: 28px; max-width: 11ch;
   margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.02;
   pointer-events: none;
 }

@@ -74,17 +74,24 @@ def back(dark):
     muted = (176, 176, 180, 255) if dark else (70, 70, 74, 255)
     im = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(im)
-    photo = circle_head(280)
-    im.alpha_composite(photo, (96, (H - photo.height) // 2 - 20))
-    x = 96 + photo.width + 56
-    y = 250
-    d.text((x, y), "AGENT NAME", font=font(FONT_B, 54), fill=fg)
-    d.text((x, y + 68), "REALTOR®", font=font(FONT_M, 26), fill=muted)
-    d.text((x, y + 150), "(000) 000-0000", font=font(FONT_R, 32), fill=fg)
-    d.text((x, y + 196), "agent@email.com", font=font(FONT_R, 32), fill=fg)
-    d.text((x, y + 242), "DRE# 00000000", font=font(FONT_R, 32), fill=fg)
-    mark = wordmark(dark, 280)
-    margin = 64
+    photo = circle_head(250)
+    name_f = font(FONT_B, 52)
+    role_f = font(FONT_M, 24)
+    body_f = font(FONT_R, 30)
+    lines = ["(000) 000-0000", "agent@email.com", "DRE# 00000000"]
+    block_h = 52 + 16 + 28 + 36 + 30 * 3 + 12 * 2
+    top = (H - max(photo.height, block_h)) // 2
+    im.alpha_composite(photo, (110, top + (max(photo.height, block_h) - photo.height) // 2))
+    x = 110 + photo.width + 64
+    y = top + (max(photo.height, block_h) - block_h) // 2
+    d.text((x, y), "AGENT NAME", font=name_f, fill=fg)
+    d.text((x, y + 64), "REALTOR®", font=role_f, fill=muted)
+    yy = y + 130
+    for line in lines:
+        d.text((x, yy), line, font=body_f, fill=fg)
+        yy += 42
+    mark = wordmark(dark, 260)
+    margin = 72
     im.alpha_composite(mark, (W - margin - mark.width, H - margin - mark.height))
     return im
 

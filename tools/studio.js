@@ -394,11 +394,11 @@ function buildAFrame(color) {
     clearcoat: 0.55,
     clearcoatRoughness: 0.2
   });
-  const frameW = 0.71;
-  // Short swinger: the whole stand is about 1.45 times the hanging sign.
-  const legLen = 0.50;
+  const frameW = 0.84;
+  // Feet sit a few inches under the sign. The stand is about 1.4 times the sign.
+  const legLen = 0.47;
   const tubeR = 0.0034;
-  const spread = 0.10;
+  const spread = 0.085;
   const alpha = Math.asin(spread / legLen);
   const cosA = Math.cos(alpha);
   const sinA = Math.sin(alpha);
@@ -429,7 +429,7 @@ function buildAFrame(color) {
   group.add(clip);
 
   // 24 in wide. Height follows the Open House art, which is 18×12 (3:2), so 16 in tall.
-  const signW = 0.6096;
+  const signW = 0.54;
   const signH = signW * (2 / 3);
   const ringR = 0.018;
   const ringXs = [-signW * 0.28, signW * 0.28];
@@ -441,7 +441,7 @@ function buildAFrame(color) {
   }
   const signTop = hingeY - 0.04;
   const panel = openHouseBoard(signW, signH, 0.005, color);
-  panel.position.set(0, signTop - signH / 2, barZ + 0.012);
+  panel.position.set(0, signTop - signH / 2, 0);
   group.add(panel);
   return group;
 }

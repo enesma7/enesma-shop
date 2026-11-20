@@ -1,47 +1,19 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const UI = window.ShopUI;
 const Cat = window.ShopCatalog;
 const Cart = window.ShopCart;
 
-// Hanger and clip photos. contact is the point that rests on the rail,
-// as a fraction of the image. neck is the top of the velvet, where the collar sits.
-const HANGER = { src: 'hanger.png', w: 1079, h: 770, contact: [524 / 1079, 68 / 770], neck: 373 / 770 };
-const CLIP = { src: 'clip.png', w: 330, h: 773, contact: [171 / 330, 36 / 773], grip: 300 / 773 };
-
 const SPECS = [
-  {
-    sku: 't-shirt', hang: 't-shirt', w: 0.94, h: 1.08, support: 0.58, neckDrop: -0.01, emblem: true,
-    neck: {
-      black: { front: [0.500, 0.128], back: [0.500, 0.128] },
-      white: { front: [0.500, 0.128], back: [0.500, 0.128] }
-    }
-  },
-  {
-    sku: 'polo', hang: 'polo', w: 0.82, h: 1.14, support: 0.56, neckDrop: -0.006, emblem: true,
-    neck: {
-      black: { front: [0.462, 0.048], back: [0.484, 0.055] },
-      white: { front: [0.462, 0.048], back: [0.511, 0.055] }
-    }
-  },
-  {
-    sku: 'quarter-zip', hang: 'quarter-zip', w: 0.90, h: 1.10, support: 0.50, neckDrop: -0.006, emblem: true,
-    neck: {
-      black: { front: [0.552, 0.105], back: [0.498, 0.105] },
-      white: { front: [0.545, 0.105], back: [0.494, 0.105] }
-    }
-  },
-  {
-    sku: 'cap', hang: 'cap', w: 0.62, h: 0.48, support: 0.105, neckDrop: -0.03, emblem: false, clip: true,
-    neck: {
-      black: { front: [0.587, 0.073], back: [0.587, 0.073] },
-      white: { front: [0.588, 0.077], back: [0.588, 0.077] }
-    }
-  }
+  { sku: 't-shirt', hang: 't-shirt', tall: 0.98, shelf: false },
+  { sku: 'polo', hang: 'polo', tall: 1.05, shelf: false },
+  { sku: 'quarter-zip', hang: 'quarter-zip', tall: 1.0, shelf: false },
+  { sku: 'cap', hang: 'cap', tall: 0.32, shelf: true }
 ];
 
-const RAIL_Y = 0.56;
-const SPACING = 0.86;
+const RAIL_Y = 0.48;
+const SPACING = 0.92;
 
 function boot() {
   const stage = document.getElementById('stage');
@@ -53,119 +25,317 @@ function boot() {
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.08;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#f4f2ee');
-  const camera = new THREE.PerspectiveCamera(26, 1, 0.05, 40);
+  scene.background = new THREE.Color('#f6f3ee');
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.045).texture;
+
+  const camera = new THREE.PerspectiveCamera(27, 1, 0.05, 40);
   const rackCenter = SPACING * 1.5;
 
-  scene.add(new THREE.AmbientLight('#fffaf6', 0.7));
-  const key = new THREE.DirectionalLight('#fff8f2', 1.05);
-  key.position.set(-0.6, 2.6, 2.2);
+  scene.add(new THREE.AmbientLight('#fff6ee', 0.42));
+  const key = new THREE.DirectionalLight('#fff1e2', 2.15);
+  key.position.set(-1.6, 3.4, 2.6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 12;
+  key.shadow.camera.left = -3;
+  key.shadow.camera.right = 3;
+  key.shadow.camera.top = 2;
+  key.shadow.camera.bottom = -2;
   scene.add(key);
+  const fill = new THREE.DirectionalLight('#e7eef6', 0.45);
+  fill.position.set(2.2, 1.4, 1.8);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight('#f3e6cf', 0.35);
+  rim.position.set(0.2, 1.6, -2.4);
+  scene.add(rim);
 
-  const rail = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.0125, 0.0125, SPACING * 3 + 1.15, 32),
-    new THREE.MeshBasicMaterial({ map: metalTexture() })
+  const wall = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 8),
+    new THREE.MeshStandardMaterial({ color: '#f6f3ee', roughness: 1 })
   );
+  wall.position.set(rackCenter, 0.1, -0.55);
+  wall.receiveShadow = true;
+  scene.add(wall);
+
+  const railMat = new THREE.MeshStandardMaterial({ color: '#101014', metalness: 0.72, roughness: 0.28 });
+  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, SPACING * 3 + 1.4, 40), railMat);
   rail.rotation.z = Math.PI / 2;
-  rail.position.set(rackCenter, RAIL_Y, -0.03);
+  rail.position.set(rackCenter, RAIL_Y, 0);
+  rail.castShadow = true;
   scene.add(rail);
 
-  const loader = new THREE.TextureLoader();
-  function loadMap(url) {
+  const velvet = new THREE.MeshStandardMaterial({ color: '#141416', roughness: 0.78, metalness: 0.04 });
+  const gold = new THREE.MeshPhysicalMaterial({
+    color: '#d5be87',
+    metalness: 1,
+    roughness: 0.18,
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.18,
+    envMapIntensity: 1.25
+  });
+  const shelfMat = new THREE.MeshStandardMaterial({ color: '#121214', roughness: 0.42, metalness: 0.35 });
+
+  function loadImage(url) {
     return new Promise(function (resolve, reject) {
-      loader.load(url, function (tex) {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 8;
-        resolve(tex);
-      }, undefined, reject);
+      const img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = reject;
+      img.src = url;
     });
   }
-
-  function photo(map, w, h) {
-    const mat = new THREE.MeshBasicMaterial({
-      map: map,
-      transparent: true,
-      alphaTest: 0.04,
-      depthWrite: true,
-      side: THREE.FrontSide
-    });
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  function makeTex(img) {
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.needsUpdate = true;
+    return tex;
   }
 
-  // Put `frac` of the photo at local (0, y) and return the mesh position.
-  function hangPosition(w, h, frac, y, z) {
-    const px = (frac[0] - 0.5) * w;
-    const py = (0.5 - frac[1]) * h;
-    return new THREE.Vector3(-px, y - py, z);
+  function garmentMesh(frontImg, backImg, targetH, sideColor) {
+    const max = 110;
+    const sc = max / Math.max(frontImg.width, frontImg.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(8, Math.round(frontImg.width * sc));
+    canvas.height = Math.max(8, Math.round(frontImg.height * sc));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(frontImg, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const src = imageData.data;
+    const iw0 = canvas.width;
+    const ih0 = canvas.height;
+    for (let pass = 0; pass < 3; pass++) {
+      const mark = [];
+      for (let y = 1; y < ih0 - 1; y++) {
+        for (let x = 1; x < iw0 - 1; x++) {
+          const o = (y * iw0 + x) * 4;
+          if (src[o + 3] < 24) continue;
+          if (src[o] < 175 || src[o + 1] < 175 || src[o + 2] < 175) continue;
+          const near = [o - 4, o + 4, o - iw0 * 4, o + iw0 * 4].some(function (n) { return src[n + 3] < 24; });
+          if (near) mark.push(o);
+        }
+      }
+      mark.forEach(function (o) { src[o + 3] = 0; });
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const data = src;
+    const iw = canvas.width;
+    const ih = canvas.height;
+    const step = 2;
+    const samples = [];
+    let minY = ih;
+    let maxY = 0;
+    for (let y = 0; y < ih; y += step) {
+      let left = -1;
+      let right = -1;
+      for (let x = 0; x < iw; x++) {
+        if (data[(y * iw + x) * 4 + 3] > 36) {
+          if (left < 0) left = x;
+          right = x;
+        }
+      }
+      if (left >= 0 && right - left > 2) {
+        samples.push({ y: y, l: left, r: right });
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    const opaque = Math.max(1, maxY - minY);
+    const worldH = targetH * (ih / opaque);
+    const worldW = worldH * (frontImg.width / frontImg.height);
+    const thick = Math.max(0.02, targetH * 0.034);
+    const bulge = targetH * 0.028;
+    const cols = 20;
+    const frontPos = [];
+    const frontUv = [];
+    const frontIdx = [];
+    const backPos = [];
+    const backUv = [];
+    const backIdx = [];
+    const sidePos = [];
+    const sideIdx = [];
+    const rows = samples.map(function (s) {
+      const front = [];
+      const back = [];
+      for (let i = 0; i <= cols; i++) {
+        const t = i / cols;
+        const px = s.l + (s.r - s.l) * t;
+        const u = px / iw;
+        const v = 1 - (s.y + 0.5) / ih;
+        const x = (u - 0.5) * worldW;
+        const yy = (0.5 - (s.y + 0.5) / ih) * worldH;
+        const lift = bulge * Math.sin(Math.PI * t) * Math.sin(Math.PI * (s.y - minY) / opaque);
+        front.push(frontPos.length / 3);
+        frontPos.push(x, yy, thick * 0.5 + lift);
+        frontUv.push(u, v);
+        back.push(backPos.length / 3);
+        backPos.push(x, yy, -thick * 0.5 - lift * 0.4);
+        backUv.push(u, v);
+      }
+      return { front: front, back: back };
+    });
+    function sideQuad(a, b, c, d) {
+      const base = sidePos.length / 3;
+      [a, b, c, d].forEach(function (p) { sidePos.push(p.x, p.y, p.z); });
+      sideIdx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+    for (let r = 0; r < rows.length - 1; r++) {
+      const a = rows[r];
+      const b = rows[r + 1];
+      for (let i = 0; i < cols; i++) {
+        frontIdx.push(a.front[i], b.front[i], a.front[i + 1], a.front[i + 1], b.front[i], b.front[i + 1]);
+        backIdx.push(a.back[i], a.back[i + 1], b.back[i], a.back[i + 1], b.back[i + 1], b.back[i]);
+      }
+      const edge = function (index) {
+        return {
+          x: frontPos[a.front[index] * 3],
+          y: frontPos[a.front[index] * 3 + 1],
+          zf: frontPos[a.front[index] * 3 + 2],
+          zb: backPos[a.back[index] * 3 + 2],
+          y2: frontPos[b.front[index] * 3 + 1],
+          x2: frontPos[b.front[index] * 3],
+          zf2: frontPos[b.front[index] * 3 + 2],
+          zb2: backPos[b.back[index] * 3 + 2]
+        };
+      };
+      [0, cols].forEach(function (index) {
+        const e = edge(index);
+        if (Math.abs(e.x - e.x2) > Math.abs(e.y - e.y2) * 0.45) return;
+        sideQuad(
+          { x: e.x, y: e.y, z: e.zf },
+          { x: e.x, y: e.y, z: e.zb },
+          { x: e.x2, y: e.y2, z: e.zf2 },
+          { x: e.x2, y: e.y2, z: e.zb2 }
+        );
+      });
+    }
+    function geo(pos, uv, idx) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }
+    const frontMat = new THREE.MeshBasicMaterial({
+      map: makeTex(canvas), alphaTest: 0.35, side: THREE.FrontSide
+    });
+    const backMat = new THREE.MeshBasicMaterial({
+      map: makeTex(backImg), alphaTest: 0.55, side: THREE.FrontSide
+    });
+    const sideMat = new THREE.MeshStandardMaterial({ color: sideColor, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+    const group = new THREE.Group();
+    [new THREE.Mesh(geo(frontPos, frontUv, frontIdx), frontMat), new THREE.Mesh(geo(backPos, backUv, backIdx), backMat), new THREE.Mesh(geo(sidePos, null, sideIdx), sideMat)].forEach(function (mesh) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    });
+    group.userData.frontMat = frontMat;
+    group.userData.backMat = backMat;
+    const box = new THREE.Box3().setFromObject(group);
+    group.userData.top = box.max.y;
+    group.userData.bottom = box.min.y;
+    return group;
+  }
+
+  function makeHanger() {
+    const g = new THREE.Group();
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.23, -0.012);
+    shape.bezierCurveTo(-0.14, 0.1, 0.14, 0.1, 0.23, -0.012);
+    shape.lineTo(0.21, -0.034);
+    shape.bezierCurveTo(0.1, 0.062, -0.1, 0.062, -0.21, -0.034);
+    shape.closePath();
+    const bodyGeo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.018, bevelEnabled: true, bevelThickness: 0.0035, bevelSize: 0.0035, bevelSegments: 2, curveSegments: 18
+    });
+    bodyGeo.translate(0, 0, -0.009);
+    const bodyMat = velvet.clone();
+    const hookMat = gold.clone();
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.009, 0.012), bodyMat);
+    bar.position.set(0, -0.026, 0);
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.075, 0),
+      new THREE.Vector3(0, 0.13, 0),
+      new THREE.Vector3(0.012, 0.175, 0),
+      new THREE.Vector3(0.046, 0.198, 0),
+      new THREE.Vector3(0.07, 0.168, 0),
+      new THREE.Vector3(0.05, 0.132, 0)
+    ]);
+    const hook = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.011, 16, false), hookMat);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.028, 16), hookMat);
+    neck.position.y = 0.06;
+    g.add(body, bar, hook, neck);
+    g.traverse(function (obj) { if (obj.isMesh) obj.castShadow = true; });
+    g.scale.setScalar(1.35);
+    g.position.y = -0.25;
+    return g;
   }
 
   const pieces = [];
+  const capX = 3 * SPACING;
 
-  Promise.all([
-    loadMap(window.SHOP_BASE + 'assets/gear/' + HANGER.src),
-    loadMap(window.SHOP_BASE + 'assets/gear/' + CLIP.src),
-    loadMap(window.SHOP_BASE + 'assets/gear/shadow.png')
-  ]).then(function (shared) {
-    const hangerMap = shared[0];
-    const clipMap = shared[1];
-    const shadowMap = shared[2];
-    return Promise.all(SPECS.map(async function (spec, index) {
-      const maps = {};
-      for (const color of ['black', 'white']) {
-        const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
-        maps[color] = {
-          front: await loadMap(base + '-front.png'),
-          back: await loadMap(base + '-back.png'),
-          backEmblem: spec.emblem ? await loadMap(base + '-back-emblem.png') : null
-        };
-      }
-      const group = new THREE.Group();
-      const ref = spec.clip ? CLIP : HANGER;
-      const supportH = spec.support * (ref.h / ref.w);
-      const support = photo(spec.clip ? clipMap : hangerMap, spec.support, supportH);
-      support.position.copy(hangPosition(spec.support, supportH, ref.contact, 0, spec.clip ? 0.02 : 0.012));
-      support.renderOrder = 1;
-      const neckFrac = spec.clip ? ref.grip : ref.neck;
-      const neckY = (ref.contact[1] - neckFrac) * supportH - spec.neckDrop;
-      const cloth = photo(maps.black.front, spec.w, spec.h);
-      const backCloth = photo(maps.black.back, spec.w, spec.h);
-      cloth.renderOrder = 2;
-      backCloth.renderOrder = 2;
-      backCloth.material.opacity = 0;
-      const shadow = new THREE.Mesh(
-        new THREE.PlaneGeometry(spec.w * 0.7, spec.h * 0.28),
-        new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false, opacity: 0.45 })
-      );
-      shadow.position.set(0.03, neckY - spec.h * 0.32, -0.08);
-      shadow.renderOrder = 0;
-      group.add(shadow, support, cloth, backCloth);
-      const x = index * SPACING;
-      group.position.set(x, RAIL_Y, 0);
-      scene.add(group);
-      pieces[index] = {
-        spec: spec,
-        group: group,
-        support: support,
-        cloth: cloth,
-        backCloth: backCloth,
-        shadow: shadow,
-        maps: maps,
-        neckY: neckY,
-        homeX: x,
-        x: x,
-        scale: 1,
-        opacity: 1,
-        angle: 0,
-        frontMix: 1,
-        backMix: 0
+  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.016, 0.34), shelfMat);
+  shelf.position.set(capX, RAIL_Y + 0.34, 0.04);
+  shelf.castShadow = true;
+  shelf.receiveShadow = true;
+  scene.add(shelf);
+
+  Promise.all(SPECS.map(async function (spec, index) {
+    const colors = {};
+    for (const color of ['black', 'white']) {
+      const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
+      colors[color] = {
+        front: await loadImage(base + '-front.png'),
+        back: await loadImage(base + '-back.png')
       };
-      placeGarments(pieces[index], 'black');
-    }));
-  }).then(start).catch(function () {
+    }
+    const side = { black: '#101014', white: '#e6e3de' };
+    const shells = {
+      black: garmentMesh(colors.black.front, colors.black.back, spec.tall, side.black),
+      white: garmentMesh(colors.white.front, colors.white.back, spec.tall, side.white)
+    };
+    shells.white.visible = false;
+    const rotator = new THREE.Group();
+    rotator.add(shells.black, shells.white);
+    if (!spec.shelf) rotator.add(makeHanger());
+    const holder = new THREE.Group();
+    if (spec.shelf) {
+      const drop = -shells.black.userData.bottom + 0.012;
+      shells.black.position.y = drop;
+      shells.white.position.y = drop;
+      holder.position.set(capX, shelf.position.y + 0.008, 0.04);
+    } else {
+      const neck = -0.1;
+      shells.black.position.y = neck - shells.black.userData.top;
+      shells.white.position.y = neck - shells.white.userData.top;
+      holder.position.set(index * SPACING, RAIL_Y, 0);
+    }
+    holder.add(rotator);
+    scene.add(holder);
+    pieces[index] = {
+      spec: spec,
+      holder: holder,
+      rotator: rotator,
+      shells: shells,
+      homeX: holder.position.x,
+      homeY: holder.position.y,
+      x: holder.position.x,
+      y: holder.position.y,
+      scale: 1,
+      opacity: 1,
+      angle: 0,
+      spin: 0
+    };
+  })).then(start).catch(function () {
     sheet.hidden = false;
     sheet.innerHTML = '<h2>Gear</h2><p class="hint">The closet photos could not be loaded.</p>';
   });
@@ -173,61 +343,58 @@ function boot() {
   let hover = null;
   let active = null;
   let mode = 'rack';
-  const colorState = { color: 'black', size: 'M', agentName: false, agentNameText: '', backEmblem: false };
+  const colorState = { color: 'black', size: 'M', agentName: false, agentNameText: '' };
 
-  function placeGarments(piece, color) {
-    const neck = piece.spec.neck[color] || piece.spec.neck.black;
-    piece.cloth.position.copy(hangPosition(piece.spec.w, piece.spec.h, neck.front, piece.neckY, 0.04));
-    piece.backCloth.position.copy(hangPosition(piece.spec.w, piece.spec.h, neck.back, piece.neckY, 0.04));
+  function showColor(color) {
+    colorState.color = color;
+    pieces.forEach(function (piece) {
+      piece.shells.black.visible = color === 'black';
+      piece.shells.white.visible = color === 'white';
+    });
   }
 
   function applyVisuals() {
     pieces.forEach(function (piece) {
-      piece.group.position.x += (piece.x - piece.group.position.x) * 0.18;
-      piece.group.rotation.y = 0;
-      const s = piece.group.scale.x + (piece.scale - piece.group.scale.x) * 0.18;
-      piece.group.scale.setScalar(s);
-      const frontMat = piece.cloth.material;
-      const backMat = piece.backCloth.material;
-      frontMat.opacity += (piece.frontMix * piece.opacity - frontMat.opacity) * 0.22;
-      backMat.opacity += (piece.backMix * piece.opacity - backMat.opacity) * 0.22;
-      frontMat.transparent = true;
-      backMat.transparent = true;
-      frontMat.depthWrite = frontMat.opacity > 0.85;
-      backMat.depthWrite = backMat.opacity > 0.85;
-      piece.support.material.opacity += (piece.opacity - piece.support.material.opacity) * 0.22;
-      piece.support.material.transparent = true;
-      piece.shadow.material.opacity += (0.5 * piece.opacity - piece.shadow.material.opacity) * 0.22;
+      piece.spin *= 0.93;
+      if (Math.abs(piece.spin) < 0.0004) piece.spin = 0;
+      piece.angle += piece.spin;
+      piece.rotator.rotation.y += (piece.angle - piece.rotator.rotation.y) * 0.35;
+      piece.holder.position.x += (piece.x - piece.holder.position.x) * 0.16;
+      piece.holder.position.y += (piece.y - piece.holder.position.y) * 0.16;
+      const s = piece.holder.scale.x + (piece.scale - piece.holder.scale.x) * 0.16;
+      piece.holder.scale.setScalar(s);
+      piece.holder.traverse(function (obj) {
+        if (!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(function (mat) {
+          if (mat.opacity === undefined) return;
+          mat.transparent = piece.opacity < 0.98;
+          mat.opacity += (piece.opacity - mat.opacity) * 0.2;
+        });
+      });
     });
   }
 
   function layoutRack(focus) {
     pieces.forEach(function (piece) {
-      let x = piece.homeX;
-      if (focus && focus !== piece) x += piece.homeX < focus.homeX ? -0.16 : 0.16;
-      piece.x = x;
-      piece.scale = focus === piece ? 1.18 : 1;
+      piece.x = piece.homeX + (focus && focus !== piece ? (piece.homeX < focus.homeX ? -0.12 : 0.12) : 0);
+      piece.y = piece.homeY;
+      piece.scale = focus === piece ? 1.08 : 1;
       piece.opacity = 1;
-      if (mode !== 'detail') {
-        piece.angle = 0;
-        piece.frontMix = 1;
-        piece.backMix = 0;
-      }
     });
   }
 
   function layoutDetail(focus) {
     pieces.forEach(function (piece) {
       if (piece === focus) {
-        piece.x = rackCenter - 0.42;
-        piece.scale = 1.34;
+        piece.x = rackCenter - 0.35;
+        piece.y = piece.homeY;
+        piece.scale = 1.22;
         piece.opacity = 1;
       } else {
-        piece.x = piece.homeX < focus.homeX ? rackCenter - 2.4 : rackCenter + 2.4;
-        piece.scale = 0.92;
+        piece.x = piece.homeX < focus.homeX ? -1.4 : rackCenter + 2.2;
+        piece.scale = 0.9;
         piece.opacity = 0.12;
-        piece.frontMix = 1;
-        piece.backMix = 0;
       }
     });
   }
@@ -236,51 +403,12 @@ function boot() {
     const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
     camera.aspect = aspect;
     const half = Math.tan((camera.fov * Math.PI / 180) / 2);
-    const fit = function (span) { return (span / Math.max(0.5, aspect)) / (2 * half); };
-    let z = Math.max(3.6, fit(SPACING * 3 + 1.35));
-    let lookX = rackCenter;
-    let lookY = 0.08;
-    if (mode === 'detail' && aspect < 1) {
-      z = Math.max(3.3, fit(2.35));
-      lookY = 0.16;
-    }
-    camera.position.set(lookX, lookY + 0.04, z);
-    camera.lookAt(lookX, lookY, 0);
+    const span = mode === 'detail' && aspect < 1 ? 1.8 : SPACING * 3 + 1.5;
+    const z = Math.max(3.4, (span / Math.max(0.5, aspect)) / (2 * half));
+    camera.position.set(rackCenter, 0.22, z);
+    camera.lookAt(rackCenter, 0.12, 0);
     camera.updateProjectionMatrix();
     renderer.setSize(stage.clientWidth, stage.clientHeight);
-  }
-
-  function turntable(angle) {
-    const a = ((angle % 360) + 360) % 360;
-    if (a < 50 || a > 310) return { front: 1, back: 0 };
-    if (a < 90) {
-      const t = (a - 50) / 40;
-      return { front: 1 - t, back: t };
-    }
-    if (a < 230) return { front: 0, back: 1 };
-    if (a < 270) {
-      const t = (a - 230) / 40;
-      return { front: t, back: 1 - t };
-    }
-    return { front: 1, back: 0 };
-  }
-
-  function applyTurn(piece) {
-    const mix = turntable(piece.angle);
-    piece.frontMix = mix.front;
-    piece.backMix = mix.back;
-    const color = colorState.color;
-    const pack = piece.maps[color];
-    const backMap = (colorState.backEmblem && pack.backEmblem) ? pack.backEmblem : pack.back;
-    if (piece.cloth.material.map !== pack.front) {
-      piece.cloth.material.map = pack.front;
-      piece.cloth.material.needsUpdate = true;
-    }
-    if (piece.backCloth.material.map !== backMap) {
-      piece.backCloth.material.map = backMap;
-      piece.backCloth.material.needsUpdate = true;
-    }
-    placeGarments(piece, color);
   }
 
   function showPill(piece) {
@@ -288,27 +416,17 @@ function boot() {
     const priced = Cat.priceOf(product, { color: 'black', size: 'M' });
     pill.hidden = false;
     pill.innerHTML = '<b>' + product.name + '</b> · ' + Cat.money(priced.unit);
-    const v = piece.group.position.clone();
-    v.y -= 0.28 * piece.group.scale.x;
+    const v = piece.holder.position.clone();
+    v.y += piece.spec.shelf ? 0.22 : 0.08;
     v.project(camera);
     pill.style.left = (v.x * 0.5 + 0.5) * stage.clientWidth + 'px';
     pill.style.top = (-v.y * 0.5 + 0.5) * stage.clientHeight + 'px';
   }
-
   function hidePill() { pill.hidden = true; }
-
-  function recolor(color) {
-    colorState.color = color;
-    pieces.forEach(applyTurn);
-    if (active) drawSheet();
-  }
 
   function drawSheet() {
     const product = Cat.find(active.spec.sku);
     const priced = Cat.priceOf(product, colorState);
-    const emblem = window.ENESMA_CATALOG.backEmblemPrice == null
-      ? 'Back Emblem (Pending Price)'
-      : 'Back Emblem (+' + Cat.money(window.ENESMA_CATALOG.backEmblemPrice) + ')';
     sheet.hidden = false;
     headline.hidden = true;
     stage.parentElement.classList.add('detail');
@@ -323,12 +441,11 @@ function boot() {
         return '<button type="button" data-size="' + s + '" aria-pressed="' + (colorState.size === s) + '">' + s + '</button>';
       }).join('') + '</div></div>' +
       (product.agentName ? '<label class="check"><input id="cName" type="checkbox"' + (colorState.agentName ? ' checked' : '') + '> Agent Name (+' + Cat.money(window.ENESMA_CATALOG.agentNamePrice) + ')</label><div class="field"><label for="cNameText">Agent Name</label><input id="cNameText" maxlength="24" value="' + (colorState.agentNameText || '') + '"></div>' : '') +
-      (product.backEmblem ? '<label class="check"><input id="cEmblem" type="checkbox"' + (colorState.backEmblem ? ' checked' : '') + '> ' + emblem + '</label>' : '') +
       '<p class="note">One-time setup fees may apply (DTF $15 setup, embroidery $50 digitizing), confirmed by Grafek Printing.</p>' +
       '<button class="btn" type="button" id="addCloset">Add To Bag, ' + Cat.money(priced.unit) + '</button>' +
       '<p><button class="text-btn" type="button" id="backCloset">Back</button></p>';
     sheet.querySelectorAll('[data-color]').forEach(function (btn) {
-      btn.onclick = function () { recolor(btn.getAttribute('data-color')); };
+      btn.onclick = function () { showColor(btn.getAttribute('data-color')); drawSheet(); };
     });
     sheet.querySelectorAll('[data-size]').forEach(function (btn) {
       btn.onclick = function () { colorState.size = btn.getAttribute('data-size'); drawSheet(); };
@@ -337,19 +454,13 @@ function boot() {
     if (nameBox) nameBox.onchange = function () { colorState.agentName = nameBox.checked; drawSheet(); };
     const nameText = document.getElementById('cNameText');
     if (nameText) nameText.oninput = function () { colorState.agentNameText = nameText.value; };
-    const emblemBox = document.getElementById('cEmblem');
-    if (emblemBox) emblemBox.onchange = function () {
-      colorState.backEmblem = emblemBox.checked;
-      if (active) applyTurn(active);
-    };
     document.getElementById('backCloset').onclick = leave;
     document.getElementById('addCloset').onclick = function () {
       Cart.add(product.id, {
         color: colorState.color,
         size: colorState.size,
         agentName: colorState.agentName,
-        agentNameText: colorState.agentNameText,
-        backEmblem: colorState.backEmblem
+        agentNameText: colorState.agentNameText
       }, 1);
       UI.openCart();
     };
@@ -360,13 +471,11 @@ function boot() {
     hover = null;
     mode = 'detail';
     hidePill();
-    piece.angle = 0;
-    applyTurn(piece);
+    piece.spin = 0;
     layoutDetail(piece);
     drawSheet();
     frame();
   }
-
   function leave() {
     active = null;
     mode = 'rack';
@@ -385,29 +494,35 @@ function boot() {
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(pieces.map(function (p) { return p.cloth; }), false);
-    if (!hits.length) return null;
-    let best = null;
-    let bestD = 1e9;
-    hits.forEach(function (hit) {
-      const piece = pieces.filter(function (p) { return p.cloth === hit.object; })[0];
-      const d = Math.abs(hit.point.x - piece.group.position.x);
-      if (d < bestD) { bestD = d; best = piece; }
+    const meshes = [];
+    pieces.forEach(function (piece) {
+      const shell = piece.shells[colorState.color];
+      shell.traverse(function (obj) { if (obj.isMesh) meshes.push(obj); });
     });
-    return best;
+    const hits = raycaster.intersectObjects(meshes, false);
+    if (!hits.length) return null;
+    let node = hits[0].object;
+    while (node && !node.userData.piece) node = node.parent;
+    return node ? node.userData.piece : null;
   }
 
   let down = null;
   renderer.domElement.addEventListener('pointerdown', function (ev) {
-    down = { x: ev.clientX, y: ev.clientY, moved: false, piece: pick(ev) };
-    renderer.domElement.setPointerCapture(ev.pointerId);
+    down = { x: ev.clientX, y: ev.clientY, lastX: ev.clientX, moved: false, rotate: false, piece: pick(ev) };
   });
   renderer.domElement.addEventListener('pointermove', function (ev) {
-    if (down && mode === 'detail' && active) {
-      const dx = ev.clientX - down.x;
-      if (Math.abs(dx) > 4) down.moved = true;
-      active.angle = dx * 0.7;
-      applyTurn(active);
+    if (down && down.piece) {
+      const dx = ev.clientX - down.lastX;
+      const adx = Math.abs(ev.clientX - down.x);
+      const ady = Math.abs(ev.clientY - down.y);
+      if (!down.rotate && adx < 8 && ady < 8) return;
+      if (!down.rotate && ady > adx) return;
+      down.rotate = true;
+      down.moved = true;
+      down.lastX = ev.clientX;
+      down.piece.angle += dx * 0.012;
+      down.piece.spin = dx * 0.012;
+      try { renderer.domElement.setPointerCapture(ev.pointerId); } catch (e) {}
       return;
     }
     if (mode !== 'rack') return;
@@ -417,20 +532,24 @@ function boot() {
     if (piece) showPill(piece);
     else hidePill();
   });
-  renderer.domElement.addEventListener('pointerup', function (ev) {
+  renderer.domElement.addEventListener('pointerup', function () {
     if (!down) return;
     const piece = down.piece;
     const dragged = down.moved;
     down = null;
-    if (dragged && mode === 'detail') return;
+    if (dragged) return;
     if (mode === 'rack' && piece) enter(piece);
     else if (mode === 'detail' && piece && piece !== active) enter(piece);
     else if (mode === 'detail' && !piece) leave();
   });
-
   window.addEventListener('resize', frame);
 
   function start() {
+    pieces.forEach(function (piece) {
+      piece.shells.black.userData.piece = piece;
+      piece.shells.white.userData.piece = piece;
+      piece.rotator.userData.piece = piece;
+    });
     layoutRack(null);
     frame();
     (function loop() {
@@ -440,27 +559,6 @@ function boot() {
       requestAnimationFrame(loop);
     })();
   }
-}
-
-function metalTexture() {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 32;
-  const g = c.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, 256, 0);
-  grd.addColorStop(0.00, '#4a4e54');
-  grd.addColorStop(0.16, '#f4f5f6');
-  grd.addColorStop(0.30, '#7c8288');
-  grd.addColorStop(0.48, '#1c1e22');
-  grd.addColorStop(0.70, '#121316');
-  grd.addColorStop(0.86, '#3a3e44');
-  grd.addColorStop(1.00, '#4a4e54');
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 256, 32);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  return tex;
 }
 
 if (document.getElementById('stage')) boot();

@@ -164,12 +164,10 @@ def decorate_polo(color):
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     # Wearer's left chest is the image-right chest, just under the collar.
-    paste_center(im, word, x0 + bw * 0.64, y0 + bh * 0.20, bw * 0.11)
+    paste_center(im, word, x0 + bw * 0.64, y0 + bh * 0.20, bw * 0.105)
     fill = (247, 247, 245, 255) if color == "black" else (20, 20, 22, 255)
-    mark = name_mark("AGENT NAME", fill, bw * 0.11)
-    # Same sleeve, along the cuff, tipped to follow the sleeve.
-    mark = mark.rotate(18, expand=True, resample=Image.Resampling.BICUBIC)
-    im.alpha_composite(mark, (int(x0 + bw * 0.78), int(y0 + bh * 0.36)))
+    mark = name_mark("AGENT NAME", fill, bw * 0.105)
+    im.alpha_composite(mark, (int(x0 + bw * 0.80), int(y0 + bh * 0.355)))
     front_cut = cut_white(im)
     back_cut = with_emblem(cut_white(back), color)
     save_pair(front_cut, "polo", color, "front")
@@ -223,10 +221,11 @@ def with_emblem(im, color):
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     mark = tonal_emblem(color)
-    width = max(8, int(bw * 0.072))
+    width = max(8, int(bw * 0.105))
     height = max(1, int(width * mark.height / mark.width))
     cx = (x0 + x1) / 2
-    cy = y0 + bh * 0.085 + height / 2
+    # About 2 to 3 inches under the neckline seam, still small.
+    cy = y0 + bh * 0.13
     paste_center(im, mark, cx, cy, width)
     return im
 

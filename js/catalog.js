@@ -1,9 +1,7 @@
 /* ENESMA Shop catalog. Edit prices and copy here.
-   backEmblemPrice: null shows "Back Emblem (Pending Price)" and does not charge it.
-   Set a number (USD) when Grafek confirms the price. */
+   Every garment includes the ENESMA back emblem. It is not an add-on. */
 (function (w) {
   var C = {
-    backEmblemPrice: null,
     agentNamePrice: 10,
     sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     products: [
@@ -12,13 +10,13 @@
         category: 'gear',
         name: 'T-Shirt',
         detail: 'Gildan 8000',
-        blurb: 'DTF print with the ENESMA Realty logo centered on the chest. White or Black. Sizes S through XXL.',
+        blurb: 'DTF print with the ENESMA Realty logo centered on the chest. ENESMA emblem on the back. White or Black. Sizes S through XXL.',
         price: 19.65,
         priceXXL: 22.60,
         model: 't-shirt',
         sizes: true,
         agentName: false,
-        backEmblem: true,
+        backEmblem: false,
         personal: false
       },
       {
@@ -26,13 +24,13 @@
         category: 'gear',
         name: 'Polo',
         detail: 'Sport-Tek ST550',
-        blurb: 'Embroidered logo on the left chest. Optional agent name on the sleeve.',
+        blurb: 'Embroidered logo on the left chest. Optional agent name on the sleeve. ENESMA emblem on the back.',
         price: 34.49,
         priceXXL: 35.84,
         model: 'polo',
         sizes: true,
         agentName: true,
-        backEmblem: true,
+        backEmblem: false,
         personal: false
       },
       {
@@ -40,13 +38,13 @@
         category: 'gear',
         name: 'Quarter-Zip',
         detail: 'Sport-Tek ST581',
-        blurb: 'Embroidered logo on the chest. Optional agent name on the sleeve.',
+        blurb: 'Embroidered logo on the chest. Optional agent name on the sleeve. ENESMA emblem on the back.',
         price: 44.94,
         priceXXL: 51.24,
         model: 'quarter-zip',
         sizes: true,
         agentName: true,
-        backEmblem: true,
+        backEmblem: false,
         personal: false
       },
       {
@@ -54,12 +52,12 @@
         category: 'gear',
         name: 'Cap',
         detail: 'Sport-Tek STC26',
-        blurb: 'Embroidered logo on the front. Optional agent name on the side.',
+        blurb: 'Embroidered logo on the front. Optional agent name on the left side. ENESMA emblem on the back.',
         price: 30,
         model: 'cap',
         sizes: true,
         agentName: true,
-        backEmblem: true,
+        backEmblem: false,
         personal: false
       },
       {
@@ -169,10 +167,6 @@
     var pending = [];
     var nameText = String(sel.agentNameText || '').trim();
     if (product.agentName && sel.agentName && nameText) add += C.agentNamePrice;
-    if (product.backEmblem && sel.backEmblem) {
-      if (C.backEmblemPrice == null) pending.push('Back Emblem');
-      else add += Number(C.backEmblemPrice) || 0;
-    }
     var from = product.variants ? product.variants[0].price : product.price;
     if (product.variants) {
       for (var j = 1; j < product.variants.length; j++) from = Math.min(from, product.variants[j].price);
@@ -194,7 +188,7 @@
     var priced = priceOf(product, sel);
     if (priced.variantLabel) bits.push(priced.variantLabel);
     if (product.agentName && sel.agentName && String(sel.agentNameText || '').trim()) bits.push('Name: ' + String(sel.agentNameText).trim());
-    if (product.backEmblem && sel.backEmblem) bits.push(C.backEmblemPrice == null ? 'Back Emblem (Pending Price)' : 'Back Emblem');
+    if (product.category === 'gear') bits.push('ENESMA back emblem (standard)');
     var person = sel.personal || {};
     if (product.personal && person.name) bits.push(person.name);
     return bits.join(' · ');

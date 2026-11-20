@@ -43,7 +43,7 @@
       '<header><h2>Your Bag</h2><button class="text-btn" id="closeCart" type="button">Close</button></header>' +
       '<div class="lines" id="cartLines"></div>' +
       '<footer><p class="est"><span>Estimated Total</span><b id="cartTotal"></b></p>' +
-      '<p class="fine">Grafek Printing will contact you to confirm and collect payment. Setup fees and a pending back emblem are not included.</p>' +
+      '<p class="fine">Grafek Printing will contact you to confirm and collect payment. Setup fees are not included.</p>' +
       '<a class="btn" href="checkout/">Order</a></footer></aside>';
   }
   function renderBag() {

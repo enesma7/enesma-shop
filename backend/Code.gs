@@ -177,7 +177,6 @@ function sanitizeItem(item, index) {
     lineTotal: lineTotal,
     pending: (item.pending || []).map(function (x) { return clean(x, 40); }).slice(0, 4),
     agentName: clean(item.agentName, 40),
-    backEmblem: item.backEmblem === true,
     personal: cleanedPersonal
   };
 }
@@ -232,6 +231,8 @@ function ordersSheet() {
   return sheet;
 }
 
+var gearSku = { 't-shirt': 1, 'polo': 1, 'quarter-zip': 1, 'cap': 1 };
+
 function sendOrderMail(record) {
   var to = String(props().getProperty('ORDER_TO') || '').trim();
   var cc = String(props().getProperty('ORDER_CC') || '').trim();
@@ -239,7 +240,7 @@ function sendOrderMail(record) {
   var rows = record.items.map(function (item) {
     return '<tr><td>' + esc(item.name) + '</td><td>' + esc(item.color) + '</td><td>' + esc(item.size) + '</td><td>' + esc(item.summary) +
       '</td><td>' + item.qty + '</td><td>' + money(item.unitPrice) + '</td><td>' + money(item.lineTotal) + '</td><td>' +
-      esc(item.agentName || '') + '</td><td>' + (item.backEmblem ? 'Yes' : '') + '</td><td>' +
+      esc(item.agentName || '') + '</td><td>' + (gearSku[item.sku] ? 'ENESMA back emblem (standard)' : '') + '</td><td>' +
       esc(item.personal && item.personal.name || '') + '</td><td>' + esc(item.personal && item.personal.phone || '') + '</td><td>' +
       esc(item.personal && item.personal.email || '') + '</td><td>' + esc(item.personal && item.personal.dre || '') + '</td><td>' +
       (item.personal && item.personal.photoLink ? '<a href="' + esc(item.personal.photoLink) + '">Photo</a>' : esc(item.personal && item.personal.photoMode || '')) +
@@ -249,7 +250,7 @@ function sendOrderMail(record) {
     '<p>' + esc(record.buyerName) + '<br>' + esc(record.buyerEmail) + '<br>' + esc(record.buyerPhone) + '</p>' +
     (record.notes ? '<p>Notes: ' + esc(record.notes) + '</p>' : '') +
     '<table border="1" cellpadding="6" cellspacing="0"><tr><th>Item</th><th>Color</th><th>Size</th><th>Options</th><th>Qty</th><th>Unit</th><th>Line</th><th>Agent Name</th><th>Back Emblem</th><th>Print Name</th><th>Print Phone</th><th>Print Email</th><th>DRE</th><th>Photo</th></tr>' +
-    rows + '</table><p>Estimated total ' + money(record.total) + '. Pending back-emblem prices and one-time setup fees are not included. Please contact the buyer to confirm and collect payment.</p>';
+    rows + '</table><p>Estimated total ' + money(record.total) + '. Every garment includes the ENESMA back emblem. One-time setup fees are not included. Please contact the buyer to confirm and collect payment.</p>';
   var mail = {
     to: to,
     replyTo: record.buyerEmail,

@@ -219,10 +219,10 @@
 
   function applyFade(t) {
     if (overlayGone || finishing) return;
-    var fade = t < 4.08 ? 1 : Math.max(0, 1 - (t - 4.08) / 0.92);
+    var fade = t < 4.52 ? 1 : Math.max(0, 1 - (t - 4.52) / 0.78);
     root.style.opacity = String(fade);
-    if (t >= 4.08) document.documentElement.classList.remove('eshop-intro-on');
-    if (t >= 5) removeOverlay();
+    if (t >= 4.52) document.documentElement.classList.remove('eshop-intro-on');
+    if (t >= 5.32) removeOverlay();
   }
 
   function clock() {
@@ -239,7 +239,7 @@
       applyFade(t);
     }
     if (synced && audio && !audio.paused) {
-      audio.volume = t < 4.85 ? 1 : Math.max(0, 1 - (t - 4.85) / 0.6);
+      audio.volume = t < 5.05 ? 1 : Math.max(0, 1 - (t - 5.05) / 0.4);
       if (t < 5.5 && !audio.ended) {
         raf = requestAnimationFrame(frame);
         return;
@@ -247,12 +247,12 @@
       try { audio.pause(); } catch (e) {}
       return;
     }
-    if (t < 5.05) raf = requestAnimationFrame(frame);
+    if (t < 5.4) raf = requestAnimationFrame(frame);
   }
 
   function beginPlayback() {
     mark();
-    audio = new Audio(base + 'assets/intro/intro-audio.m4a?v=' + asset);
+    audio = new Audio(base + 'assets/intro/intro-audio.m4a?v=' + asset + '-shine');
     audio.preload = 'auto';
     audio.playsInline = true;
     var began = false;
@@ -305,7 +305,6 @@
       'uniform float uTime, uAspect, uFocal, uCam, uCube, uLogoW, uLift;',
       'varying vec3 vCol;',
       'varying vec3 vN;',
-      'varying float vLock;',
       'mat3 spinMat(vec3 a, float ang) {',
       '  a = normalize(a);',
       '  float s = sin(ang);',
@@ -350,7 +349,6 @@
       '  vec3 red = mix(vec3(0.93725, 0.00784, 0.02745), vec3(0.60392, 0.0, 0.02745), gt);',
       '  vCol = mix(vec3(0.98431), red, aKind);',
       '  vN = normalize(r * aNrm);',
-      '  vLock = smoothstep(3.74, 4.04, t) * (1.0 - smoothstep(4.1, 4.5, t));',
       '}'
     ].join('\n');
 
@@ -358,15 +356,13 @@
       'precision mediump float;',
       'varying vec3 vCol;',
       'varying vec3 vN;',
-      'varying float vLock;',
       'void main() {',
       '  vec3 n = normalize(vN);',
       '  float ndl = clamp(dot(n, normalize(vec3(0.28, 0.58, 0.76))), 0.0, 1.0);',
       '  float rim = pow(1.0 - abs(dot(n, vec3(0.0, 0.0, 1.0))), 1.35);',
       '  vec3 gold = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), clamp(n.y * 0.5 + 0.5, 0.0, 1.0));',
       '  vec3 col = mix(mix(vec3(0.0, 0.0, 0.02745), vCol, 0.34), vCol, 0.12 + 0.88 * ndl);',
-      '  col = mix(col, gold, rim * (0.2 + vLock * 1.25));',
-      '  col += gold * vLock * 0.22;',
+      '  col = mix(col, gold, rim * 0.16);',
       '  gl_FragColor = vec4(col, 1.0);',
       '}'
     ].join('\n');
@@ -404,13 +400,9 @@
       '  vec3 p = aPos;',
       '  float band = step(0.5, fract(aUv.y * 12.0 + glitch * 7.0));',
       '  p.x += (band * 2.0 - 1.0) * glitch * uLogoW * 0.038;',
-      '  float pop = 0.0;',
-      '  if (t > 3.92 && t < 4.28) pop = sin((t - 3.92) / 0.36 * 3.14159) * 0.03;',
-      '  p.xy *= (1.0 + pop);',
       '  float gS = smoothstep(0.99, 1.03, t) * (1.0 - smoothstep(1.06, 1.16, t));',
-      '  float bS = smoothstep(3.94, 3.99, t) * (1.0 - smoothstep(4.02, 4.16, t));',
-      '  p.x += sin(t * 93.0) * (gS * 0.016 + bS * 0.011);',
-      '  p.y += cos(t * 77.0) * (gS * 0.016 + bS * 0.011) + uLift;',
+      '  p.x += sin(t * 93.0) * gS * 0.016;',
+      '  p.y += cos(t * 77.0) * gS * 0.016 + uLift;',
       '  float k = uFocal / uCam;',
       '  gl_Position = vec4(p.x * k, p.y * k * uAspect, 0.2, 1.0);',
       '  vUv = aUv;',
@@ -419,22 +411,34 @@
       '  else if (t >= 1.14 && t < 3.7) a = 0.0;',
       '  else if (t >= 3.7 && t < 3.98) a = (t - 3.7) / 0.28;',
       '  vA = a;',
-      '  float hit = 1.0 - clamp(abs(t - 4.04) / 0.15, 0.0, 1.0);',
-      '  float hold = (t >= 4.0 && t < 4.8) ? (1.0 - (t - 4.0) / 0.8) : 0.0;',
-      '  vGlow = max(hit, hold * 0.9);',
+      '  float glowIn = smoothstep(3.96, 4.12, t);',
+      '  float glowOut = 1.0 - smoothstep(4.35, 4.9, t);',
+      '  vGlow = glowIn * glowOut;',
       '}'
     ].join('\n');
 
     var fsLogo = [
-      'precision mediump float;',
+      'precision highp float;',
       'varying vec2 vUv;',
       'varying float vA;',
       'varying float vGlow;',
       'uniform sampler2D uTex;',
+      'uniform float uTime;',
       'void main() {',
       '  vec4 tex = texture2D(uTex, vUv);',
       '  if (tex.a * vA < 0.02) discard;',
-      '  gl_FragColor = vec4(tex.rgb, tex.a * vA);',
+      '  float t = uTime;',
+      '  float u = clamp((t - 3.98) / 0.6, 0.0, 1.0);',
+      '  float diag = vUv.x * 0.9 + vUv.y * 0.22;',
+      '  float head = u * 1.45 - 0.22;',
+      '  float d = diag - head;',
+      '  float band = exp(-d * d * 70.0);',
+      '  float core = exp(-d * d * 280.0);',
+      '  float env = smoothstep(0.0, 0.06, u) * (1.0 - smoothstep(0.78, 1.0, u));',
+      '  float sweep = (band * 0.72 + core * 0.55) * env;',
+      '  vec3 foil = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), clamp(vUv.x, 0.0, 1.0));',
+      '  vec3 col = mix(tex.rgb, mix(tex.rgb, foil, 0.58), clamp(sweep, 0.0, 1.0));',
+      '  gl_FragColor = vec4(col, tex.a * vA);',
       '}'
     ].join('\n');
 
@@ -448,21 +452,22 @@
       'void main() {',
       '  if (vGlow < 0.01) discard;',
       '  vec2 b = uBlur;',
-      '  float c = texture2D(uTex, vUv).a;',
-      '  float e = 0.0;',
-      '  e += texture2D(uTex, vUv + vec2(b.x, 0.0)).a;',
-      '  e += texture2D(uTex, vUv + vec2(-b.x, 0.0)).a;',
-      '  e += texture2D(uTex, vUv + vec2(0.0, b.y)).a;',
-      '  e += texture2D(uTex, vUv + vec2(0.0, -b.y)).a;',
-      '  e += texture2D(uTex, vUv + vec2(b.x, b.y) * 0.65).a;',
-      '  e += texture2D(uTex, vUv + vec2(-b.x, b.y) * 0.65).a;',
-      '  e += texture2D(uTex, vUv + vec2(b.x, -b.y) * 0.65).a;',
-      '  e += texture2D(uTex, vUv + vec2(-b.x, -b.y) * 0.65).a;',
-      '  e *= 0.125;',
-      '  float rim = clamp((e - c) * 1.8 + e * (1.0 - c) * 0.65, 0.0, 1.0);',
+      '  float halo = 0.0;',
+      '  halo += texture2D(uTex, vUv + vec2(b.x, 0.0)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(-b.x, 0.0)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(0.0, b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(0.0, -b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(b.x, b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(-b.x, b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(b.x, -b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(-b.x, -b.y)).a;',
+      '  halo += texture2D(uTex, vUv + vec2(b.x, 0.0) * 1.8).a;',
+      '  halo += texture2D(uTex, vUv + vec2(-b.x, 0.0) * 1.8).a;',
+      '  halo += texture2D(uTex, vUv + vec2(0.0, b.y) * 1.8).a;',
+      '  halo += texture2D(uTex, vUv + vec2(0.0, -b.y) * 1.8).a;',
+      '  halo *= 0.083;',
       '  vec3 gold = mix(vec3(0.91765, 0.83529, 0.61961), vec3(0.83529, 0.74510, 0.52941), vUv.x);',
-      '  vec3 hot = mix(vec3(0.98431), gold, 0.42);',
-      '  gl_FragColor = vec4(hot, rim * vGlow);',
+      '  gl_FragColor = vec4(gold, halo * vGlow * 0.22);',
       '}'
     ].join('\n');
 
@@ -620,7 +625,7 @@
       if (t >= 3.88 && t <= 4.85) {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
         mark(glowProg);
-        var blurPx = 7 + (t > 3.96 && t < 4.22 ? 5 : 0);
+        var blurPx = 34.0;
         gl.uniform2f(gl.getUniformLocation(glowProg, 'uBlur'), blurPx / texCanvas.width, blurPx / texCanvas.height);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       }
@@ -666,6 +671,7 @@
       if (capture) sceneDraw(0);
       else beginPlayback();
     } catch (err) {
+      api.error = String(err && err.message || err);
       closeAll();
     }
   };

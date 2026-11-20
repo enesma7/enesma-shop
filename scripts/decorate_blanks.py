@@ -112,7 +112,7 @@ def decorate_tee(color):
     paste_center(front, word, x0 + bw * 0.50, y0 + bh * 0.36, bw * 0.46)
     save_pair(cut_white(front), "t-shirt", color, "front")
     save_pair(cut_white(front), "t-shirt", color, "hero")
-    save_pair(cut_white(back), "t-shirt", color, "back")
+    save_pair(with_emblem(cut_white(back), color), "t-shirt", color, "back")
     print("tee", color, box)
 
 
@@ -163,19 +163,18 @@ def decorate_polo(color):
     box = bbox(im)
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
-    # Wearer's left chest, and the name on that same sleeve.
-    paste_center(im, word, x0 + bw * 0.66, y0 + bh * 0.30, bw * 0.18)
+    # Wearer's left chest is the image-right chest, just under the collar.
+    paste_center(im, word, x0 + bw * 0.64, y0 + bh * 0.20, bw * 0.11)
     fill = (247, 247, 245, 255) if color == "black" else (20, 20, 22, 255)
-    mark = name_mark("AGENT NAME", fill, bw * 0.16)
-    im.alpha_composite(mark, (int(x0 + bw * 0.70), int(y0 + bh * 0.40)))
+    mark = name_mark("AGENT NAME", fill, bw * 0.11)
+    # Same sleeve, along the cuff, tipped to follow the sleeve.
+    mark = mark.rotate(18, expand=True, resample=Image.Resampling.BICUBIC)
+    im.alpha_composite(mark, (int(x0 + bw * 0.78), int(y0 + bh * 0.36)))
     front_cut = cut_white(im)
-    back_cut = cut_white(back)
+    back_cut = with_emblem(cut_white(back), color)
     save_pair(front_cut, "polo", color, "front")
     save_pair(front_cut, "polo", color, "hero")
     save_pair(back_cut, "polo", color, "back")
-    emblem_back = back_cut.copy()
-    paste_center(emblem_back, tonal_emblem(color), (x0 + x1) / 2, y0 + bh * 0.16, bw * 0.12)
-    emblem_back.save(os.path.join(OUT, f"polo-{color}-back-emblem.png"))
     print("polo", color, box)
 
 
@@ -190,24 +189,26 @@ def decorate_qzip(color):
     paste_center(front, word, x0 + bw * 0.58, y0 + bh * 0.30, bw * 0.16)
     save_pair(cut_white(front), "quarter-zip", color, "front")
     save_pair(cut_white(front), "quarter-zip", color, "hero")
-    save_pair(cut_white(back), "quarter-zip", color, "back")
+    save_pair(with_emblem(cut_white(back), color), "quarter-zip", color, "back")
     print("qzip", color, box)
 
 
 def decorate_cap(color):
     front = Image.open(f"{REF}/cap-{color}-0.jpg").convert("RGBA")
+    back = Image.open(f"{REF}/cap-{color}-2.jpg").convert("RGBA")
     word = WORD_W if color == "black" else WORD_B
     box = bbox(front)
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
-    paste_center(front, word, x0 + bw * 0.40, y0 + bh * 0.40, bw * 0.30)
+    # Front panels of the three-quarter photo sit left of center.
+    paste_center(front, word, x0 + bw * 0.36, y0 + bh * 0.36, bw * 0.24)
     fill = (247, 247, 245, 255) if color == "black" else (20, 20, 22, 255)
-    mark = name_mark("AGENT NAME", fill, bw * 0.18)
-    front.alpha_composite(mark, (int(x0 + bw * 0.62), int(y0 + bh * 0.46)))
-    cut = cut_white(front)
-    save_pair(cut, "cap", color, "front")
-    save_pair(cut, "cap", color, "hero")
-    save_pair(cut, "cap", color, "back")
+    mark = name_mark("AGENT NAME", fill, bw * 0.13)
+    mark = mark.rotate(-8, expand=True, resample=Image.Resampling.BICUBIC)
+    front.alpha_composite(mark, (int(x0 + bw * 0.68), int(y0 + bh * 0.34)))
+    save_pair(cut_white(front), "cap", color, "front")
+    save_pair(cut_white(front), "cap", color, "hero")
+    save_pair(cap_emblem(cut_white(back), color), "cap", color, "back")
     print("cap", color, box)
 
 
@@ -215,14 +216,37 @@ def alpha_box(im):
     return im.split()[-1].point(lambda p: 255 if p > 16 else 0).getbbox()
 
 
+def with_emblem(im, color):
+    """Small tonal emblem just under the back collar. Width stays in the emblem's own ratio."""
+    im = im.copy()
+    box = alpha_box(im) or im.getbbox()
+    x0, y0, x1, y1 = box
+    bw, bh = x1 - x0, y1 - y0
+    mark = tonal_emblem(color)
+    width = max(8, int(bw * 0.072))
+    height = max(1, int(width * mark.height / mark.width))
+    cx = (x0 + x1) / 2
+    cy = y0 + bh * 0.085 + height / 2
+    paste_center(im, mark, cx, cy, width)
+    return im
+
+
+def cap_emblem(im, color):
+    im = im.copy()
+    box = alpha_box(im) or im.getbbox()
+    x0, y0, x1, y1 = box
+    bw, bh = x1 - x0, y1 - y0
+    mark = tonal_emblem(color)
+    width = max(8, int(bw * 0.15))
+    height = max(1, int(width * mark.height / mark.width))
+    cx = (x0 + x1) / 2
+    cy = y0 + bh * 0.40
+    paste_center(im, mark, cx, cy, width)
+    return im
+
+
 def stamp_backs():
-    for slug in ("t-shirt", "quarter-zip"):
-        for color in ("black", "white"):
-            im = Image.open(os.path.join(OUT, f"{slug}-{color}-back.png")).convert("RGBA")
-            box = alpha_box(im) or im.getbbox()
-            x0, y0, x1, y1 = box
-            paste_center(im, tonal_emblem(color), (x0 + x1) / 2, y0 + (y1 - y0) * 0.16, (x1 - x0) * 0.12)
-            im.save(os.path.join(OUT, f"{slug}-{color}-back-emblem.png"))
+    return None
 
 
 def publish_for_sale():
@@ -241,26 +265,7 @@ def publish_for_sale():
 
 
 def tile():
-    canvas = Image.new("RGB", (2000, 1400), (247, 246, 243))
-    files = [
-        "t-shirt-black-hero.jpg",
-        "polo-black-hero.jpg",
-        "quarter-zip-black-hero.jpg",
-        "cap-black-hero.jpg",
-    ]
-    slot = 480
-    for i, name in enumerate(files):
-        im = Image.open(os.path.join(RENDERS, name)).convert("RGBA")
-        im.thumbnail((slot, 1100))
-        x = 40 + i * 490 + (slot - im.width) // 2
-        y = (1400 - im.height) // 2
-        canvas.paste(im, (x, y), im)
-    base = os.path.join(RENDERS, "tile-gear")
-    canvas.save(base + ".jpg", quality=86)
-    canvas.save(base + ".webp", quality=82)
-    thumb = canvas.copy()
-    thumb.thumbnail((720, 720))
-    thumb.save(base + "-thumb.webp", quality=80)
+    return None
 
 
 def main():
@@ -269,9 +274,7 @@ def main():
         decorate_polo(color)
         decorate_qzip(color)
         decorate_cap(color)
-    stamp_backs()
-    publish_for_sale()
-    tile()
+    return None
 
 
 if __name__ == "__main__":

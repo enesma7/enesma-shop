@@ -21,8 +21,8 @@
       '</div>';
   }
   function tile(href, file, label) {
-    return '<a class="tile" href="' + href + '"><picture><source srcset="assets/renders/' + file + '.webp" type="image/webp">' +
-      '<img src="assets/renders/' + file + '.jpg" alt=""></picture><span>' + label + '</span></a>';
+    return '<a class="tile" href="' + href + '"><img src="assets/tiles/' + file + '.jpg" alt="" width="1280" height="720">' +
+      '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span></a>';
   }
 
   function category(cat, title, lede) {
@@ -49,7 +49,7 @@
     UI.$('#content').appendChild(root);
     function draw() {
       var priced = Cat.priceOf(product, state);
-      var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : ['hero'];
+      var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : product.category === 'cards' ? ['hero', 'back'] : ['hero'];
       UI.$('#gallery').innerHTML = shots.map(function (view) {
         return picture(product.id, state.color, view, product.name + ' in ' + (state.color === 'white' ? 'White' : 'Black'));
       }).join('');

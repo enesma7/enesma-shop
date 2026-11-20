@@ -79,10 +79,10 @@ for (const color of colors) {
       job.fill = 0.9;
     } else if (product === 'a-frame') {
       job.width = 1800;
-      job.height = 2250;
-      job.yaw = 0.78;
-      job.fill = 0.82;
-      job.lift = 0.22;
+      job.height = 1600;
+      job.yaw = 0.42;
+      job.fill = 0.9;
+      job.lift = 0.06;
       job.background = '#f3f1ec';
     }
     jobs.push({ file: id + '-' + color + '-hero', job });

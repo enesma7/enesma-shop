@@ -49,39 +49,37 @@ def for_sale(dark=False):
     im = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(im)
     logo = Image.open(LOGO_W if dark else LOGO_B)
-    paste_logo(im, logo, W / 2, 250, 980)
-    # FOR SALE
-    f = font(FONT_B, 196)
+    paste_logo(im, logo, W / 2, 160, 860)
+    f = font(FONT_B, 168)
     text = "FOR SALE"
-    # tracked like the sheet
-    gap = 36
+    gap = 28
     widths = [d.textlength(ch, font=f) for ch in text]
     total = sum(widths) + gap * (len(text) - 1)
     x = (W - total) / 2
-    y = 820
+    y = 620
     for ch, wch in zip(text, widths):
         d.text((x, y), ch, font=f, fill=fg)
         x += wch + gap
-    agent = cutout_agent(1040)
-    im.alpha_composite(agent, (70, H - agent.height + 30))
-    # Two-line name, same stack as ENRIQUE / ESPARZA on the sheet.
-    nx = 980
-    ny = H - 920
-    d.text((nx, ny), "AGENT", font=font(FONT_B, 96), fill=fg)
-    name_f = font(FONT_B, 72)
+    # Standing placeholder, fully on the board, lower left. Name sits to its right.
+    agent = cutout_agent(980)
+    ax, ay = 90, H - agent.height - 70
+    im.alpha_composite(agent, (ax, ay))
+    nx = ax + agent.width + 40
+    ny = ay + 80
+    d.text((nx, ny), "AGENT", font=font(FONT_B, 84), fill=fg)
+    name_f = font(FONT_B, 64)
     letters = "NAME"
     lw = [d.textlength(ch, font=name_f) for ch in letters]
-    gapn = 18
+    gapn = 14
     xx = nx
     for ch, wch in zip(letters, lw):
-        d.text((xx, ny + 118), ch, font=name_f, fill=fg)
+        d.text((xx, ny + 100), ch, font=name_f, fill=fg)
         xx += wch + gapn
-    d.text((nx, ny + 230), "(000) 000-0000", font=font(FONT_M, 46), fill=fg)
-    d.text((nx, ny + 292), "agent@email.com", font=font(FONT_R, 28), fill=muted)
+    d.text((nx, ny + 200), "(000) 000-0000", font=font(FONT_M, 40), fill=fg)
     dre = "DRE# 00000000"
-    df = font(FONT_R, 32)
+    df = font(FONT_R, 30)
     dw = d.textlength(dre, font=df)
-    d.text((W - 120 - dw, H - 120), dre, font=df, fill=fg)
+    d.text((W - 80 - dw, H - 90), dre, font=df, fill=fg)
     return im
 
 def tracked_width(draw, text, face, gap):
@@ -161,21 +159,21 @@ def open_house(dark=False):
     x0, x1 = chev_x, min(W - 1, chev_x + shift + chev_w)
     for x in range(x0, x1 + 1):
         t = (x - x0) / max(1, (x1 - x0))
+        # Illyrian Red, #EF0207 into #9A0007.
         col = (
-            int(154 + (239 - 154) * t),
-            int(0 + 2 * t),
-            int(7 + (7 - 7) * t),
+            int(239 + (154 - 239) * t),
+            int(2 + (0 - 2) * t),
+            7,
             255,
         )
         gd.line([(x, 0), (x, H)], fill=col)
     grad.putalpha(mask)
     im.alpha_composite(grad)
-    # Agent is cut out and runs off the bottom edge, same as the sheet.
-    agent = cutout_agent(int(H * 0.56))
-    im.alpha_composite(agent, (int(W * 0.045), H - agent.height + int(H * 0.02)))
+    agent = cutout_agent(int(H * 0.50))
+    im.alpha_composite(agent, (int(W * 0.05), H - agent.height - int(H * 0.04)))
     logo = Image.open(LOGO_W if dark else LOGO_B)
-    logo_w = int(W * 0.40)
-    logo_x = int(W * 0.80)
+    logo_w = int(W * 0.34)
+    logo_x = int(W * 0.70)
     logo_y = int(H * 0.50)
     paste_logo(im, logo, logo_x, logo_y, logo_w)
     name_f = font(FONT_B, int(H * 0.072))

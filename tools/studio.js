@@ -395,9 +395,10 @@ function buildAFrame(color) {
     clearcoatRoughness: 0.2
   });
   const frameW = 0.71;
-  const legLen = 1.05;
+  // Short swinger: the whole stand is about 1.45 times the hanging sign.
+  const legLen = 0.50;
   const tubeR = 0.0034;
-  const spread = 0.28;
+  const spread = 0.10;
   const alpha = Math.asin(spread / legLen);
   const cosA = Math.cos(alpha);
   const sinA = Math.sin(alpha);
@@ -438,7 +439,7 @@ function buildAFrame(color) {
     ring.position.set(x, hingeY - ringR * 0.15, barZ);
     group.add(ring);
   }
-  const signTop = hingeY - ringR * 2.15;
+  const signTop = hingeY - 0.04;
   const panel = openHouseBoard(signW, signH, 0.005, color);
   panel.position.set(0, signTop - signH / 2, barZ + 0.012);
   group.add(panel);

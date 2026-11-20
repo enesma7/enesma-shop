@@ -88,16 +88,17 @@ h1, h2, h3, p { text-wrap: pretty; }
 .page { padding: 8px 0 48px; }
 .hero-tiles { display: grid; gap: 12px; padding: 12px 12px 28px; background: #000007; }
 .tile {
-  position: relative; display: block; aspect-ratio: 4/5; overflow: hidden; background: #000007;
+  position: relative; display: block; aspect-ratio: 1 / 1.1; overflow: hidden; background: #000007;
   text-decoration: none; color: #fbfbfb;
 }
+.tile picture { display: block; width: 100%; height: 100%; }
 .tile img {
-  width: 100%; height: 100%; object-fit: contain; object-position: center;
+  width: 100%; height: 100%; object-fit: cover; object-position: center;
   position: absolute; inset: 0;
 }
 .tile::before {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(90deg, rgba(0, 0, 7, 0.78) 0%, rgba(0, 0, 7, 0.42) 34%, rgba(0, 0, 7, 0) 58%);
+  background: linear-gradient(to top, rgba(0, 0, 7, 0.88) 0%, rgba(0, 0, 7, 0.45) 26%, rgba(0, 0, 7, 0) 52%);
 }
 .tile .copy {
   position: absolute; left: 20px; bottom: 20px; z-index: 2;
@@ -129,6 +130,11 @@ h1, h2, h3, p { text-wrap: pretty; }
 .gallery { background: #f4f3f0; overflow: hidden; }
 .gallery picture { display: block; max-width: 100%; }
 .gallery img { width: 100%; max-width: 100%; height: auto; object-fit: contain; }
+.cards-product { display: block; }
+.cards-product .gallery { background: #0c0c0e; }
+.card-stack { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 0 28px; }
+.card-stack picture { width: 88%; max-width: none; }
+.card-stack img { width: 100%; height: auto; }
 .buy { padding: 8px 16px 28px; max-width: 560px; }
 .buy h1 { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; margin: 12px 0 0; }
 .buy .detail { color: var(--muted); margin: 4px 0 0; }
@@ -252,15 +258,22 @@ h1, h2, h3, p { text-wrap: pretty; }
   .hero-tiles { gap: 16px; padding: 20px 20px 40px; }
   .tile { aspect-ratio: 16/9; }
   .tile img { object-fit: cover; object-position: center; }
+  .tile::before { background: linear-gradient(90deg, rgba(0, 0, 7, 0.78) 0%, rgba(0, 0, 7, 0.42) 34%, rgba(0, 0, 7, 0) 58%); }
   .tile .copy { left: 36px; bottom: 32px; }
   .tile .copy b { font-size: 44px; }
   .grid { grid-template-columns: repeat(3, 1fr); gap: 28px 18px; }
   .product { grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr); align-items: start; gap: 28px; }
+  .cards-product { display: block; }
   .buy { position: sticky; top: 84px; padding-top: 24px; }
   .closet { flex-direction: row; }
   .stage { height: auto; flex: 1.4; min-height: calc(100vh - var(--header)); }
   .sheet { width: min(400px, 38vw); margin: 0; border-radius: 0; overflow: auto; }
   .btn.fit { width: auto; }
+}
+
+@media (min-width: 1100px) {
+  .card-stack { flex-direction: row; justify-content: center; align-items: center; gap: 20px; padding: 40px 24px 48px; }
+  .card-stack picture { width: 520px; }
 }
 
 @media (max-width: 759px) {

@@ -75,24 +75,24 @@ def back(dark):
     muted = (176, 176, 180, 255) if dark else (70, 70, 74, 255)
     im = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(im)
-    photo = circle_head(250)
-    name_f = font(FONT_B, 52)
-    role_f = font(FONT_M, 24)
-    body_f = font(FONT_R, 30)
+    photo = circle_head(300)
+    name_f = font(FONT_B, 92)
+    role_f = font(FONT_M, 36)
+    body_f = font(FONT_M, 58)
     lines = ["(000) 000-0000", "agent@email.com", "DRE# 00000000"]
-    block_h = 52 + 16 + 28 + 36 + 30 * 3 + 12 * 2
+    block_h = 92 + 44 + 70 + 58 * 3 + 18 * 2
     top = (H - max(photo.height, block_h)) // 2
-    im.alpha_composite(photo, (110, top + (max(photo.height, block_h) - photo.height) // 2))
-    x = 110 + photo.width + 64
+    im.alpha_composite(photo, (90, top + (max(photo.height, block_h) - photo.height) // 2))
+    x = 90 + photo.width + 56
     y = top + (max(photo.height, block_h) - block_h) // 2
     d.text((x, y), "AGENT NAME", font=name_f, fill=fg)
-    d.text((x, y + 64), "REALTOR®", font=role_f, fill=muted)
-    yy = y + 130
+    d.text((x, y + 108), "REALTOR®", font=role_f, fill=muted)
+    yy = y + 180
     for line in lines:
         d.text((x, yy), line, font=body_f, fill=fg)
-        yy += 42
-    mark = wordmark(dark, 260)
-    margin = 72
+        yy += 76
+    mark = wordmark(dark, 280)
+    margin = 64
     im.alpha_composite(mark, (W - margin - mark.width, H - margin - mark.height))
     return im
 
@@ -158,7 +158,11 @@ def save(im, name):
 
 def main():
     for dark, color in ((True, "black"), (False, "white")):
-        pair = studio_pair(front(dark), back(dark))
+        face = front(dark)
+        rear = back(dark)
+        save(face, f"cards-1000-{color}-front")
+        save(rear, f"cards-1000-{color}-back")
+        pair = studio_pair(face, rear)
         save(pair, f"cards-1000-{color}-hero")
         print("cards", color, pair.size)
 

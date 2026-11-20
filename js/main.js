@@ -25,7 +25,9 @@
       '</div>';
   }
   function tile(href, file, label) {
-    return '<a class="tile" href="' + href + '"><img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720">' +
+    return '<a class="tile" href="' + href + '"><picture>' +
+      '<source media="(max-width: 759px)" srcset="' + versioned('assets/tiles/' + file + '-phone.jpg') + '">' +
+      '<img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720"></picture>' +
       '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span></a>';
   }
 
@@ -53,10 +55,19 @@
     UI.$('#content').appendChild(root);
     function draw() {
       var priced = Cat.priceOf(product, state);
-      var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : ['hero'];
-      UI.$('#gallery').innerHTML = shots.map(function (view) {
-        return picture(product.id, state.color, view, product.name + ' in ' + (state.color === 'white' ? 'White' : 'Black'));
-      }).join('');
+      var colorName = state.color === 'white' ? 'White' : 'Black';
+      if (product.id === 'cards-1000') {
+        root.classList.add('cards-product');
+        UI.$('#gallery').innerHTML = '<div class="card-stack">' +
+          picture(product.id, state.color, 'front', product.name + ' front in ' + colorName) +
+          picture(product.id, state.color, 'back', product.name + ' back in ' + colorName) +
+          '</div>';
+      } else {
+        var shots = product.category === 'gear' ? ['hero', 'front', 'back'] : ['hero'];
+        UI.$('#gallery').innerHTML = shots.map(function (view) {
+          return picture(product.id, state.color, view, product.name + ' in ' + colorName);
+        }).join('');
+      }
       var html = '<h1>' + h(product.name) + '</h1><p class="detail">' + h(product.detail) + '</p>' +
         '<p class="price" id="price">' + Cat.money(priced.unit) + '</p>' +
         '<p class="blurb">' + h(product.blurb) + '</p>';

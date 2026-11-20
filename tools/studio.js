@@ -341,15 +341,10 @@ async function renderSign(job) {
   const h = job.height || 2200;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
-  frameObject(group, job.yaw == null ? 0.42 : job.yaw, job.fill || 0.86, job.lift);
   if (job.product === 'open-house') {
-    const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(6, 64),
-      new THREE.MeshStandardMaterial({ color: '#e7e4df', roughness: 1, metalness: 0 })
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0;
-    scene.add(floor);
+    frameOpenHouse(group);
+  } else {
+    frameObject(group, job.yaw == null ? 0.42 : job.yaw, job.fill || 0.86, job.lift);
   }
   renderer.render(scene, camera);
   return renderer.domElement.toDataURL('image/png');
@@ -388,45 +383,52 @@ function rod(from, to, radius, material) {
   return mesh;
 }
 
+function frameOpenHouse(group) {
+  group.rotation.y = 0.22;
+  const signW = 0.4572;
+  const signBottom = 0.32;
+  const halfV = Math.tan((camera.fov * Math.PI / 180) / 2);
+  const halfH = halfV * camera.aspect;
+  const projected = signW * Math.cos(0.22);
+  const dist = (projected / 0.68) / (2 * halfH);
+  const lookY = signBottom + 0.2 * dist * halfV;
+  camera.position.set(0.16, lookY, dist);
+  camera.near = dist / 80;
+  camera.far = dist * 8;
+  camera.lookAt(0, lookY, 0);
+  camera.updateProjectionMatrix();
+  const shadow = shadowTexture();
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 1.1),
+    new THREE.MeshBasicMaterial({ map: shadow, transparent: true, depthWrite: false })
+  );
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.set(0.05, 0.002, 0.05);
+  scene.add(plane);
+}
+
 function buildHStake(color) {
   const group = new THREE.Group();
   const galv = new THREE.MeshPhysicalMaterial({
-    color: '#8f9398',
-    metalness: 0.92,
-    roughness: 0.28,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.3
+    color: '#a3a7ad',
+    metalness: 0.88,
+    roughness: 0.34,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.4
   });
   const signW = 0.4572;
   const signH = 0.3048;
-  const wire = 0.0046;
-  const half = 0.162;
-  const top = 0.82;
-  const barTop = 0.74;
-  const barLow = 0.40;
-  [-half, half].forEach(function (x) {
-    group.add(rod(new THREE.Vector3(x, -0.025, 0), new THREE.Vector3(x, top, 0), wire, galv));
-  });
-  group.add(rod(new THREE.Vector3(-half, barTop, 0), new THREE.Vector3(half, barTop, 0), wire, galv));
-  group.add(rod(new THREE.Vector3(-half, barLow, 0), new THREE.Vector3(half, barLow, 0), wire, galv));
-  group.add(rod(new THREE.Vector3(half, 0.18, 0), new THREE.Vector3(half + 0.075, 0.18, 0.03), wire, galv));
-  const sign = openHouseBoard(signW, signH, 0.005, color);
-  sign.position.set(0, (barTop + barLow) / 2, 0.014);
+  const wire = 0.0034;
+  const half = 0.092;
+  const signBottom = 0.32;
+  const sign = openHouseBoard(signW, signH, 0.008, color);
+  sign.position.set(0, signBottom + signH / 2, 0);
   group.add(sign);
-  const pile = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const mini = new THREE.Group();
-    const h = 0.072;
-    mini.add(rod(new THREE.Vector3(-h, 0, 0), new THREE.Vector3(-h, 0.30, 0), wire * 0.9, galv));
-    mini.add(rod(new THREE.Vector3(h, 0, 0), new THREE.Vector3(h, 0.30, 0), wire * 0.9, galv));
-    mini.add(rod(new THREE.Vector3(-h, 0.26, 0), new THREE.Vector3(h, 0.26, 0), wire * 0.9, galv));
-    mini.add(rod(new THREE.Vector3(-h, 0.07, 0), new THREE.Vector3(h, 0.07, 0), wire * 0.9, galv));
-    mini.rotation.y = -0.35 + i * 0.08;
-    mini.position.set(i * 0.02, 0, i * 0.018);
-    pile.add(mini);
-  }
-  pile.position.set(0.42, 0, 0.05);
-  group.add(pile);
+  [-half, half].forEach(function (x) {
+    group.add(rod(new THREE.Vector3(x, -0.015, 0), new THREE.Vector3(x, signBottom + 0.015, 0), wire, galv));
+  });
+  group.add(rod(new THREE.Vector3(-half, signBottom - 0.055, 0), new THREE.Vector3(half, signBottom - 0.055, 0), wire, galv));
+  group.add(rod(new THREE.Vector3(-half, 0.035, 0), new THREE.Vector3(half, 0.035, 0), wire, galv));
   return group;
 }
 
@@ -520,18 +522,31 @@ async function renderCards(job) {
 
 async function renderGroup(job) {
   resetScene();
+  if (job.background) scene.background = new THREE.Color(job.background);
   const group = new THREE.Group();
   let x = 0;
+  let y = 0;
+  let row = 0;
+  let rowH = 0;
   for (const item of job.items) {
+    const itemRow = item.row || 0;
+    if (itemRow !== row) {
+      y -= rowH + (item.gapY || 0.1);
+      x = 0;
+      rowH = 0;
+      row = itemRow;
+    }
     const root = await loadGLB('/models/' + item.model + '.glb');
     dress(root, THREE, tex, { color: item.color, name: item.name || '' });
     root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     root.position.x = x - box.min.x;
-    if (item.model === 'cap') root.position.y = 0.02;
+    root.position.y = y - box.min.y;
+    if (item.model === 'cap') root.position.y += 0.02;
     group.add(root);
     x += size.x + (item.gap || 0.08);
+    rowH = Math.max(rowH, size.y);
   }
   scene.add(group);
   const w = job.width || 2400;

@@ -116,6 +116,88 @@ def front_mark(word, width, arch=0.16):
     return embroider(curve_logo(sized, arch))
 
 
+def crown_word(word, width, far, slope):
+    """Wordmark wrapped on the front panels of a three-quarter photo.
+
+    The far end shortens as the panels turn away. The returned point is the
+    center of the mark, which the caller puts on the front seam.
+    """
+    sized = word.resize(
+        (width, max(1, int(width * word.height / word.width))),
+        Image.Resampling.LANCZOS,
+    )
+    curved = curve_logo(sized, 0.15)
+    big = curved.resize((curved.width * 2, curved.height * 2), Image.Resampling.LANCZOS)
+    mark, center = perspective_mark(big, yaw=0.62, half=0.40, far=far, slope=slope)
+    mark = mark.resize((max(1, mark.width // 2), max(1, mark.height // 2)), Image.Resampling.LANCZOS)
+    center = (center[0] // 2, center[1] // 2)
+    return embroider(mark), center
+
+
+def perspective_mark(mark, yaw=0.55, half=0.50, far="right", slope=0.0):
+    """Wrap a mark around the crown.
+
+    Columns toward `far` get shorter and narrower, the way a logo does as
+    the front panels turn away. `slope` tips the baseline (image y per px of
+    width, so a negative slope lifts the right side). The returned point is
+    the screen position of the mark's center, which belongs on the front seam.
+    """
+    arr = np.array(mark.convert("RGBA"))
+    h, w = arr.shape[:2]
+    if w < 2 or h < 2:
+        return mark, (mark.width // 2, mark.height // 2)
+    u = np.linspace(0.0, 1.0, w)
+    phi = (u - 0.5) * 2.0 * half
+    psi = (phi if far == "right" else -phi) + yaw
+    scale = np.clip(np.cos(psi), 0.22, None)
+    c0 = float(scale[w // 2])
+    rel = scale / c0
+    centers = np.cumsum(rel) - rel / 2.0
+    centers -= centers[w // 2]
+    # Baseline: a gentle tilt, plus the arch already baked into the bitmap.
+    baseline = centers * slope
+    top = baseline - (h * rel) / 2.0
+    bot = baseline + (h * rel) / 2.0
+    y_min = float(top.min())
+    x_min = float((centers - rel / 2.0).min())
+    out_h = int(np.ceil(bot.max() - y_min)) + 2
+    out_w = int(np.ceil((centers + rel / 2.0).max() - x_min)) + 2
+    # Inverse map. One sample per output pixel, from the source column that
+    # lands there, so letters stay whole instead of being clipped.
+    xs = np.arange(out_w) + x_min
+    src_x = np.interp(xs, centers, np.arange(w))
+    src_x = np.clip(src_x, 0, w - 1.001)
+    x0 = np.floor(src_x).astype(np.int32)
+    x1 = np.minimum(x0 + 1, w - 1)
+    tx = (src_x - x0).astype(np.float32)
+    rel_s = (1.0 - tx) * rel[x0] + tx * rel[x1]
+    base_s = (1.0 - tx) * baseline[x0] + tx * baseline[x1]
+    out = np.zeros((out_h, out_w, 4), np.float32)
+    ys = np.arange(out_h, dtype=np.float32)[:, None] + y_min
+    # Source row for every output pixel.
+    sy = (ys - base_s[None, :]) / rel_s[None, :] + (h - 1) / 2.0
+    valid = (sy >= 0) & (sy < h - 1) & (rel_s[None, :] > 0.05)
+    sy_c = np.clip(sy, 0, h - 1.001)
+    y0 = np.floor(sy_c).astype(np.int32)
+    y1 = np.minimum(y0 + 1, h - 1)
+    ty = (sy_c - y0).astype(np.float32)
+    # Bilinear sample, vectorized across rows.
+    for x in range(out_w):
+        if not valid[:, x].any():
+            continue
+        c0s = arr[:, x0[x]].astype(np.float32)
+        c1s = arr[:, x1[x]].astype(np.float32)
+        col = (1.0 - tx[x]) * c0s + tx[x] * c1s
+        yy0 = y0[:, x]
+        yy1 = y1[:, x]
+        tyx = ty[:, x][:, None]
+        sample = (1.0 - tyx) * col[yy0] + tyx * col[yy1]
+        m = valid[:, x]
+        out[m, x] = sample[m]
+    center = (int(round(-x_min)), int(round((h - 1) / 2.0 + baseline[w // 2] - y_min)))
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA"), center
+
+
 def decorate(im, white):
     """Return four views: front, side, back, three-quarter. `im` is unused; views are loaded."""
     return im
@@ -135,19 +217,17 @@ def build(color_white):
             mark = front_mark(word, int(w * 0.58), 0.20)
             paste(im, mark, ((w - mark.width) // 2, int(h * 0.46) - mark.height // 2))
         elif key == "side":
-            # Wearer's left 3/4, bill to the right. The front panels are the right
-            # portion of the crown, turned away, so the mark is foreshortened.
-            mark = foreshorten(front_mark(word, int(w * 0.30), 0.10), 0.82, near="right")
-            mark = mark.rotate(8, expand=True, resample=Image.Resampling.BICUBIC)
-            paste(im, mark, (int(w * 0.46), int(h * 0.30)))
+            # Wearer's left 3/4, bill to the right. The right end turns away
+            # around the crown. Center of the mark is the front seam.
+            mark, center = crown_word(word, int(w * 0.31), "right", -0.06)
+            paste(im, mark, (1035 - center[0], 530 - center[1]))
             label = embroider(tracked("AGENT NAME", max(22, int(h * 0.032)), ink))
             label = label.rotate(-3, expand=True, resample=Image.Resampling.BICUBIC)
             paste(im, label, (int(w * 0.08), int(h * 0.66)))
         elif key == "three":
-            # The other 3/4, bill to the left. Front panels face the camera more.
-            mark = foreshorten(front_mark(word, int(w * 0.42), 0.12), 0.84, near="left")
-            mark = mark.rotate(-6, expand=True, resample=Image.Resampling.BICUBIC)
-            paste(im, mark, (int(w * 0.22), int(h * 0.28)))
+            # The other 3/4, bill to the left. The left end is the far end.
+            mark, center = crown_word(word, int(w * 0.31), "left", 0.05)
+            paste(im, mark, (668 - center[0], 530 - center[1]))
         elif key == "back":
             # Center seam just above the strap opening on the real rear photo.
             ew = int(w * 0.068)

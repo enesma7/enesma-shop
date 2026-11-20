@@ -28,7 +28,8 @@ assert(ShopCatalog.priceOf(plastic, { variantId: 'pack2' }).unit === 100, 'plast
 assert(ShopCatalog.find('for-sale-aluminum').variants[1].price === 158, 'aluminum pack');
 assert(ShopCatalog.find('open-house').price === 134, 'open house');
 assert(ShopCatalog.find('a-frame').price === 320, 'a-frame');
-assert(ShopCatalog.find('cards-500').price === 51, 'cards 500');
+assert(ShopCatalog.find('cards-500') == null, 'cards 500 removed');
+assert(ShopCatalog.byCategory('cards').length === 1, 'only one card set');
 assert(ShopCatalog.find('cards-1000').price === 57, 'cards 1000');
 assert(ENESMA_CATALOG.backEmblemPrice === null, 'emblem config');
 console.log('price tests passed');

@@ -63,6 +63,8 @@ async function boot() {
   const wordWhite = await loadImage('/assets/logo/wordmark-white.png');
   const wordBlack = await loadImage('/assets/logo/wordmark-black.png');
   const emblem = await loadImage('/assets/logo/emblem-mask.png');
+  tex.openWhiteImg = await loadImage('/assets/signs/open-house-white.png');
+  tex.openBlackImg = await loadImage('/assets/signs/open-house-black.png');
   tex.wordWhite = imageTexture(THREE, wordWhite);
   tex.wordBlack = imageTexture(THREE, wordBlack);
   tex.emblemMask = imageTexture(THREE, emblem);
@@ -86,7 +88,7 @@ function resetScene() {
   scene.add(key, fill, rim);
 }
 
-function frameObject(object, yaw, fill) {
+function frameObject(object, yaw, fill, lift) {
   object.rotation.set(0, yaw || 0, 0);
   object.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(object);
@@ -97,7 +99,7 @@ function frameObject(object, yaw, fill) {
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
   const distX = (size.x * 0.5) / Math.tan(hFov / 2);
   const dist = Math.max(distX, distY) / (fill || 0.86);
-  camera.position.set(center.x, center.y + size.y * 0.02, center.z + dist);
+  camera.position.set(center.x, center.y + size.y * (lift == null ? 0.02 : lift), center.z + dist);
   camera.near = dist / 80;
   camera.far = dist * 8;
   camera.lookAt(center.x, center.y, center.z);
@@ -281,14 +283,45 @@ function boardMesh(width, height, depth, faceCanvas, materialKind) {
   return mesh;
 }
 
+function openHouseTexture(color) {
+  const img = color === 'black' ? tex.openBlackImg : tex.openWhiteImg;
+  const t = imageTexture(THREE, img);
+  t.anisotropy = 16;
+  return t;
+}
+
+function openHouseBoard(width, height, depth, color) {
+  const dark = color === 'black';
+  const faceMat = new THREE.MeshPhysicalMaterial({
+    map: openHouseTexture(color),
+    roughness: 0.52,
+    metalness: 0.02,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.42
+  });
+  const edge = new THREE.MeshStandardMaterial({
+    color: dark ? '#1c1c20' : '#f3f2ef',
+    roughness: 0.64,
+    metalness: 0.02
+  });
+  const back = new THREE.MeshStandardMaterial({
+    color: dark ? '#121214' : '#f7f6f3',
+    roughness: 0.72
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), [edge, edge, edge, edge, faceMat, back]);
+  mesh.castShadow = true;
+  return mesh;
+}
+
 async function renderSign(job) {
   resetScene();
+  scene.background = new THREE.Color(job.background || '#f7f6f3');
   const group = new THREE.Group();
   if (job.product === 'a-frame') {
     group.add(buildAFrame(job.color));
   } else if (job.product === 'open-house') {
-    const face = openHouseCanvas(job.color);
-    group.add(boardMesh(0.305, 0.457, 0.006, face, 'plastic'));
+    // 18 in wide by 12 in tall, the catalog sheet's exact proportion.
+    group.add(openHouseBoard(0.4572, 0.3048, 0.005, job.color));
   } else {
     const face = forSaleCanvas(job.color);
     const depth = job.product === 'aluminum' ? 0.0022 : 0.008;
@@ -309,42 +342,106 @@ async function renderSign(job) {
   const h = job.height || 2200;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
-  frameObject(group, job.yaw == null ? 0.42 : job.yaw, job.fill || 0.86);
+  frameObject(group, job.yaw == null ? 0.42 : job.yaw, job.fill || 0.86, job.lift);
   renderer.render(scene, camera);
   return renderer.domElement.toDataURL('image/png');
 }
 
+function roundedRectMesh(width, height, tubeRadius, cornerRadius, material) {
+  const hw = width / 2;
+  const hh = height / 2;
+  const cr = Math.min(cornerRadius, hw * 0.4, hh * 0.2);
+  const pts = [];
+  const steps = 8;
+  function arc(cx, cy, a0, a1) {
+    for (let i = 0; i <= steps; i++) {
+      const t = a0 + (a1 - a0) * (i / steps);
+      pts.push(new THREE.Vector3(cx + Math.cos(t) * cr, cy + Math.sin(t) * cr, 0));
+    }
+  }
+  arc(hw - cr, hh - cr, 0, Math.PI / 2);
+  arc(-hw + cr, hh - cr, Math.PI / 2, Math.PI);
+  arc(-hw + cr, -hh + cr, Math.PI, Math.PI * 1.5);
+  arc(hw - cr, -hh + cr, Math.PI * 1.5, Math.PI * 2);
+  const curve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.2);
+  const geo = new THREE.TubeGeometry(curve, pts.length * 2, tubeRadius, 16, true);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function tubeAlong(points, radius, material) {
+  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.35);
+  const geo = new THREE.TubeGeometry(curve, 48, radius, 14, false);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  return mesh;
+}
+
 function buildAFrame(color) {
   const group = new THREE.Group();
-  const dark = color === 'black';
-  const frameMat = new THREE.MeshStandardMaterial({
-    color: dark ? '#1a1a1e' : '#f4f4f2',
-    roughness: 0.45,
-    metalness: dark ? 0.15 : 0.05
+  const wire = new THREE.MeshPhysicalMaterial({
+    color: '#141418',
+    roughness: 0.34,
+    metalness: 0.82,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.32
   });
-  const face = openHouseCanvas(color);
-  const panelGeo = new THREE.BoxGeometry(0.42, 0.62, 0.012);
-  const faceMat = new THREE.MeshPhysicalMaterial({
-    map: canvasTexture(face),
-    roughness: 0.55,
-    metalness: 0.02
+  const clipMat = new THREE.MeshPhysicalMaterial({
+    color: '#0a0a0c',
+    roughness: 0.24,
+    metalness: 0.7,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.2
   });
-  const edge = new THREE.MeshStandardMaterial({ color: dark ? '#2a2a30' : '#e7e5e1', roughness: 0.6 });
-  const front = new THREE.Mesh(panelGeo, [edge, edge, edge, edge, faceMat, edge]);
-  front.position.set(0, 0.42, 0.16);
-  front.rotation.x = -0.18;
-  const back = new THREE.Mesh(panelGeo, edge);
-  back.position.set(0, 0.42, -0.16);
-  back.rotation.x = 0.18;
-  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.46, 20), frameMat);
-  hinge.rotation.z = Math.PI / 2;
-  hinge.position.set(0, 0.74, 0);
-  group.add(front, back, hinge);
-  for (const z of [-0.28, 0.28]) {
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.02, 0.04), frameMat);
-    foot.position.set(0, 0.08, z);
-    group.add(foot);
+  const frameW = 0.71;
+  const legLen = 1.05;
+  const tubeR = 0.0034;
+  const spread = 0.28;
+  const alpha = Math.asin(spread / legLen);
+  const cosA = Math.cos(alpha);
+  const sinA = Math.sin(alpha);
+  const cy = (legLen / 2) * cosA;
+
+  const front = roundedRectMesh(frameW, legLen, tubeR, 0.05, wire);
+  front.rotation.x = -alpha;
+  front.position.set(0, cy, 0.008 + (legLen / 2) * sinA);
+  const back = roundedRectMesh(frameW, legLen, tubeR, 0.05, wire);
+  back.rotation.x = alpha;
+  back.position.set(0, cy, -0.008 - (legLen / 2) * sinA);
+  group.add(front, back);
+
+  const hingeY = cy + (legLen / 2) * cosA;
+  const barZ = 0.008;
+  group.add(tubeAlong([
+    new THREE.Vector3(-0.09, hingeY, 0),
+    new THREE.Vector3(-0.09, hingeY + 0.048, 0),
+    new THREE.Vector3(-0.05, hingeY + 0.066, 0),
+    new THREE.Vector3(0.05, hingeY + 0.066, 0),
+    new THREE.Vector3(0.09, hingeY + 0.048, 0),
+    new THREE.Vector3(0.09, hingeY, 0)
+  ], tubeR * 0.92, wire));
+
+  const clip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0085, 0.022, 6, 16), clipMat);
+  clip.rotation.z = Math.PI / 2;
+  clip.position.set(0, hingeY + 0.078, 0);
+  group.add(clip);
+
+  // 24 in wide. Height follows the Open House art, which is 18×12 (3:2), so 16 in tall.
+  const signW = 0.6096;
+  const signH = signW * (2 / 3);
+  const ringR = 0.018;
+  const ringXs = [-signW * 0.28, signW * 0.28];
+  for (const x of ringXs) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(ringR, 0.002, 14, 32), wire);
+    ring.rotation.y = Math.PI / 2;
+    ring.position.set(x, hingeY - ringR * 0.15, barZ);
+    group.add(ring);
   }
+  const signTop = hingeY - ringR * 2.15;
+  const panel = openHouseBoard(signW, signH, 0.005, color);
+  panel.position.set(0, signTop - signH / 2, barZ + 0.012);
+  group.add(panel);
   return group;
 }
 

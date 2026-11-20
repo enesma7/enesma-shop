@@ -25,7 +25,7 @@
         id: 'polo',
         category: 'gear',
         name: 'Polo',
-        detail: 'Sport-Tek ST640',
+        detail: 'Sport-Tek ST550',
         blurb: 'Embroidered logo on the left chest. Optional agent name on the sleeve.',
         price: 34.49,
         priceXXL: 35.84,
@@ -67,6 +67,7 @@
         category: 'signs',
         name: 'For Sale Sign',
         detail: '18×24 Plastic',
+        image: { w: 1800, h: 2400 },
         blurb: 'Plastic rider sign, printed with your photo and contact details.',
         variants: [
           { id: 'single', label: 'Single', price: 60 },
@@ -82,6 +83,7 @@
         category: 'signs',
         name: 'For Sale Sign',
         detail: '18×24 Aluminum',
+        image: { w: 1800, h: 2400 },
         blurb: 'Aluminum rider sign, printed with your photo and contact details.',
         variants: [
           { id: 'single', label: 'Single', price: 85 },
@@ -97,6 +99,7 @@
         category: 'signs',
         name: 'Open House Signs',
         detail: '12×18 · Bundle Of 15',
+        image: { w: 2400, h: 1600 },
         blurb: 'A bundle of 15 open house signs, printed with your photo and contact details.',
         price: 134,
         sizes: false,
@@ -108,21 +111,10 @@
         id: 'a-frame',
         category: 'signs',
         name: 'Open House A-Frame',
-        detail: 'Bundle Of 5',
-        blurb: 'A bundle of 5 A-frame open house signs, printed with your photo and contact details.',
+        detail: 'Wire Stand · Bundle Of 5',
+        image: { w: 1800, h: 2250 },
+        blurb: 'A bundle of 5 black wire A-frame stands. A landscape open house sign hangs from the top bar, printed with your photo and contact details.',
         price: 320,
-        sizes: false,
-        agentName: false,
-        backEmblem: false,
-        personal: true
-      },
-      {
-        id: 'cards-500',
-        category: 'cards',
-        name: 'Business Cards',
-        detail: 'Set Of 500',
-        blurb: 'A set of 500 business cards, printed with your photo and contact details.',
-        price: 51,
         sizes: false,
         agentName: false,
         backEmblem: false,
@@ -215,6 +207,10 @@
     priceOf: priceOf,
     money: money,
     renderBase: renderBase,
+    imageSize: function (id) {
+      var product = find(id);
+      return (product && product.image) || { w: 1600, h: 2000 };
+    },
     optionSummary: optionSummary
   };
 })(window);

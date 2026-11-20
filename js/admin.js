@@ -82,7 +82,7 @@
 
   function sampleHistory() {
     var samples = [
-      { orderNumber: 'ES-SAMPLE-1001', createdAt: '2026-11-18 09:40', status: 'New', buyerName: 'Sample Agent', buyerEmail: 'agent@example.com', buyerPhone: '555-0100', total: 63.65, items: [{ name: 'T-Shirt', summary: 'Black · M', qty: 2, lineTotal: 39.3 }, { name: 'Business Cards', summary: 'White · Set Of 500', qty: 1, lineTotal: 51 }] },
+      { orderNumber: 'ES-SAMPLE-1001', createdAt: '2026-11-18 09:40', status: 'New', buyerName: 'Sample Agent', buyerEmail: 'agent@example.com', buyerPhone: '555-0100', total: 96.3, items: [{ name: 'T-Shirt', summary: 'Black · M', qty: 2, lineTotal: 39.3 }, { name: 'Business Cards', summary: 'White · Set Of 1,000', qty: 1, lineTotal: 57 }] },
       { orderNumber: 'ES-SAMPLE-1002', createdAt: '2026-11-17 15:10', status: 'Sent To Printer', buyerName: 'Sample Partner', buyerEmail: 'partner@example.com', buyerPhone: '555-0199', total: 134, items: [{ name: 'Open House Signs', summary: 'Black · Bundle Of 15', qty: 1, lineTotal: 134 }] }
     ];
     renderOrders(samples, true);

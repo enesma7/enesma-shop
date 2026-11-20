@@ -24,7 +24,9 @@
     line.thumbFallback = w.ShopCatalog.renderBase(product.id, (line.selection && line.selection.color) || 'black', 'hero') + '.jpg';
     return line;
   }
-  function items() { return read().map(hydrate); }
+  function items() {
+    return read().filter(function (line) { return w.ShopCatalog.find(line.sku); }).map(hydrate);
+  }
   function count() {
     return items().reduce(function (n, line) { return n + (Number(line.qty) || 0); }, 0);
   }

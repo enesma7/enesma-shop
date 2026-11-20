@@ -14,7 +14,17 @@ var SHOP = {
     'for-sale-aluminum': true,
     'open-house': true,
     'a-frame': true,
-    'cards-500': true,
+    'cards-1000': true
+  },
+  knownSkus: {
+    't-shirt': true,
+    'polo': true,
+    'quarter-zip': true,
+    'cap': true,
+    'for-sale-plastic': true,
+    'for-sale-aluminum': true,
+    'open-house': true,
+    'a-frame': true,
     'cards-1000': true
   }
 };
@@ -127,6 +137,7 @@ function sanitizeItem(item, index) {
   if (!qty || qty < 1 || qty > 30) fail('Check the quantity on item ' + (index + 1) + '.', 'BAD_REQUEST');
   if (!isFinite(unit) || unit < 0 || unit > 2000) fail('Check the price on item ' + (index + 1) + '.', 'BAD_REQUEST');
   var sku = clean(item.sku, 40);
+  if (!SHOP.knownSkus[sku]) fail('That product is no longer available.', 'BAD_REQUEST');
   var personal = item.personal || {};
   var cleanedPersonal = {
     name: clean(personal.name, 80),

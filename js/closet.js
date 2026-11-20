@@ -1,377 +1,466 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { dress, makeWeaveNormal, makeEmblemNormal } from './dress.js';
 
 const UI = window.ShopUI;
 const Cat = window.ShopCatalog;
 const Cart = window.ShopCart;
 
-function hasWebGL() {
-  try {
-    const canvas = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-  } catch (e) { return false; }
-}
+// Hanger and clip photos. contact is the point that rests on the rail,
+// as a fraction of the image. neck is the top of the velvet, where the collar sits.
+const HANGER = { src: 'hanger.png', w: 1079, h: 770, contact: [524 / 1079, 68 / 770], neck: 373 / 770 };
+const CLIP = { src: 'clip.png', w: 330, h: 773, contact: [171 / 330, 36 / 773], grip: 300 / 773 };
 
-function fallback() {
-  const sheet = document.getElementById('sheet');
-  const stage = document.getElementById('stage');
-  if (stage) stage.hidden = true;
-  sheet.innerHTML = '<h2>Gear</h2><p class="hint">3D is unavailable in this browser. The photos below are renders of the same models.</p><div class="grid">' +
-    Cat.byCategory('gear').map(function (p) {
-      const base = Cat.renderBase(p.id, 'black', 'hero');
-      return '<a class="card" href="gear/' + p.id + '/"><div class="ph"><picture><source srcset="' + base + '.webp" type="image/webp"><img src="' + base + '.jpg" alt="' + p.name + '"></picture></div><h2>' + p.name + '</h2><p>' + Cat.money(p.price) + '</p></a>';
-    }).join('') + '</div>';
-}
+const SPECS = [
+  {
+    sku: 't-shirt', hang: 't-shirt', w: 0.94, h: 1.08, support: 0.58, neckDrop: -0.01, emblem: true,
+    neck: {
+      black: { front: [0.500, 0.128], back: [0.500, 0.128] },
+      white: { front: [0.500, 0.128], back: [0.500, 0.128] }
+    }
+  },
+  {
+    sku: 'polo', hang: 'polo', w: 0.82, h: 1.14, support: 0.56, neckDrop: -0.006, emblem: true,
+    neck: {
+      black: { front: [0.462, 0.048], back: [0.484, 0.055] },
+      white: { front: [0.462, 0.048], back: [0.511, 0.055] }
+    }
+  },
+  {
+    sku: 'quarter-zip', hang: 'quarter-zip', w: 0.90, h: 1.10, support: 0.50, neckDrop: -0.006, emblem: true,
+    neck: {
+      black: { front: [0.552, 0.105], back: [0.498, 0.105] },
+      white: { front: [0.545, 0.105], back: [0.494, 0.105] }
+    }
+  },
+  {
+    sku: 'cap', hang: 'cap', w: 0.62, h: 0.48, support: 0.105, neckDrop: -0.03, emblem: false, clip: true,
+    neck: {
+      black: { front: [0.587, 0.073], back: [0.587, 0.073] },
+      white: { front: [0.588, 0.077], back: [0.588, 0.077] }
+    }
+  }
+];
 
-if (!hasWebGL()) {
-  fallback();
-} else {
-  boot().catch(function () { fallback(); });
-}
+const RAIL_Y = 0.56;
+const SPACING = 0.86;
 
-function loadImage(url) {
-  return new Promise(function (resolve, reject) {
-    const img = new Image();
-    img.onload = function () { resolve(img); };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
-function texOf(img, srgb) {
-  const t = new THREE.Texture(img);
-  t.needsUpdate = true;
-  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  t.anisotropy = 8;
-  return t;
-}
-
-async function boot() {
+function boot() {
   const stage = document.getElementById('stage');
   const sheet = document.getElementById('sheet');
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+  const pill = document.getElementById('pill');
+  const headline = document.getElementById('closetHeadline');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
+  renderer.toneMappingExposure = 1.02;
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#14120f');
-  scene.fog = new THREE.Fog('#14120f', 6.5, 12);
-  const camera = new THREE.PerspectiveCamera(38, stage.clientWidth / Math.max(1, stage.clientHeight), 0.08, 30);
-  camera.position.set(0.15, 1.42, 3.15);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.enablePan = false;
-  controls.enabled = false;
-  controls.target.set(0, 1.15, -0.6);
+  scene.background = new THREE.Color('#f4f2ee');
+  const camera = new THREE.PerspectiveCamera(26, 1, 0.05, 40);
+  const rackCenter = SPACING * 1.5;
 
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
-  scene.add(new THREE.AmbientLight('#ffe6cc', 0.35));
-  const key = new THREE.SpotLight('#ffd7ae', 8, 12, Math.PI / 5, 0.45, 1);
-  key.position.set(-1.2, 2.6, 1.4);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  scene.add(new THREE.AmbientLight('#fffaf6', 0.7));
+  const key = new THREE.DirectionalLight('#fff8f2', 1.05);
+  key.position.set(-0.6, 2.6, 2.2);
   scene.add(key);
-  const fill = new THREE.PointLight('#ffc99a', 2.2, 8);
-  fill.position.set(1.6, 1.8, 0.6);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight('#fff1df', 0.7);
-  rim.position.set(0, 2.2, -3);
-  scene.add(rim);
 
-  buildRoom(scene);
+  const rail = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.0125, 0.0125, SPACING * 3 + 1.15, 32),
+    new THREE.MeshBasicMaterial({ map: metalTexture() })
+  );
+  rail.rotation.z = Math.PI / 2;
+  rail.position.set(rackCenter, RAIL_Y, -0.03);
+  scene.add(rail);
 
-  const wordWhite = await loadImage(window.SHOP_BASE + 'assets/logo/wordmark-white.png');
-  const wordBlack = await loadImage(window.SHOP_BASE + 'assets/logo/wordmark-black.png');
-  const emblem = await loadImage(window.SHOP_BASE + 'assets/logo/emblem-mask.png');
-  const tex = {
-    wordWhite: texOf(wordWhite, true),
-    wordBlack: texOf(wordBlack, true),
-    emblemMask: texOf(emblem, false),
-    emblemNormal: makeEmblemNormal(THREE, emblem),
-    weave: makeWeaveNormal(THREE)
-  };
-
-  const loader = new GLTFLoader();
-  const catalog = [
-    { sku: 't-shirt', model: 't-shirt', color: 'black' },
-    { sku: 't-shirt', model: 't-shirt', color: 'white' },
-    { sku: 'polo', model: 'polo', color: 'black' },
-    { sku: 'polo', model: 'polo', color: 'white' },
-    { sku: 'quarter-zip', model: 'quarter-zip', color: 'black' },
-    { sku: 'quarter-zip', model: 'quarter-zip', color: 'white' },
-    { sku: 'cap', model: 'cap', color: 'black' },
-    { sku: 'cap', model: 'cap', color: 'white' }
-  ];
-  const glbCache = {};
-  function loadModel(name) {
-    if (glbCache[name]) return Promise.resolve(glbCache[name]);
+  const loader = new THREE.TextureLoader();
+  function loadMap(url) {
     return new Promise(function (resolve, reject) {
-      loader.load(window.SHOP_BASE + 'models/' + name + '.glb', function (gltf) {
-        glbCache[name] = gltf.scene;
-        resolve(gltf.scene);
+      loader.load(url, function (tex) {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 8;
+        resolve(tex);
       }, undefined, reject);
     });
   }
 
+  function photo(map, w, h) {
+    const mat = new THREE.MeshBasicMaterial({
+      map: map,
+      transparent: true,
+      alphaTest: 0.04,
+      depthWrite: true,
+      side: THREE.FrontSide
+    });
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  }
+
+  // Put `frac` of the photo at local (0, y) and return the mesh position.
+  function hangPosition(w, h, frac, y, z) {
+    const px = (frac[0] - 0.5) * w;
+    const py = (0.5 - frac[1]) * h;
+    return new THREE.Vector3(-px, y - py, z);
+  }
+
   const pieces = [];
-  const railY = 1.62;
-  for (let i = 0; i < catalog.length; i++) {
-    const spec = catalog[i];
-    const src = await loadModel(spec.model);
-    const root = src.clone(true);
-    dress(root, THREE, tex, { color: spec.color, name: '' });
-    const pivot = new THREE.Group();
-    pivot.add(root);
-    if (spec.model === 'cap') {
-      const shelfIndex = spec.color === 'black' ? 0 : 1;
-      pivot.position.set(-1.55, 0.92 + shelfIndex * 0.28, -0.85);
-      pivot.scale.setScalar(1.35);
-    } else {
-      const slot = pieces.filter(function (p) { return p.spec.model !== 'cap'; }).length;
-      pivot.position.set(-1.35 + slot * 0.52, railY - 0.68, -1.05);
-      addHanger(scene, pivot.position.x, railY, -1.05);
-    }
-    pivot.userData.piece = spec;
-    pivot.traverse(function (n) { if (n.isMesh) { n.castShadow = true; n.userData.pieceRoot = pivot; } });
-    scene.add(pivot);
-    pieces.push({ pivot: pivot, spec: spec, home: pivot.position.clone() });
-  }
 
-  const homeCam = camera.position.clone();
-  const homeTarget = controls.target.clone();
+  Promise.all([
+    loadMap(window.SHOP_BASE + 'assets/gear/' + HANGER.src),
+    loadMap(window.SHOP_BASE + 'assets/gear/' + CLIP.src),
+    loadMap(window.SHOP_BASE + 'assets/gear/shadow.png')
+  ]).then(function (shared) {
+    const hangerMap = shared[0];
+    const clipMap = shared[1];
+    const shadowMap = shared[2];
+    return Promise.all(SPECS.map(async function (spec, index) {
+      const maps = {};
+      for (const color of ['black', 'white']) {
+        const base = window.SHOP_BASE + 'assets/gear/' + spec.hang + '-' + color;
+        maps[color] = {
+          front: await loadMap(base + '-front.png'),
+          back: await loadMap(base + '-back.png'),
+          backEmblem: spec.emblem ? await loadMap(base + '-back-emblem.png') : null
+        };
+      }
+      const group = new THREE.Group();
+      const ref = spec.clip ? CLIP : HANGER;
+      const supportH = spec.support * (ref.h / ref.w);
+      const support = photo(spec.clip ? clipMap : hangerMap, spec.support, supportH);
+      support.position.copy(hangPosition(spec.support, supportH, ref.contact, 0, spec.clip ? 0.02 : 0.012));
+      support.renderOrder = 1;
+      const neckFrac = spec.clip ? ref.grip : ref.neck;
+      const neckY = (ref.contact[1] - neckFrac) * supportH - spec.neckDrop;
+      const cloth = photo(maps.black.front, spec.w, spec.h);
+      const backCloth = photo(maps.black.back, spec.w, spec.h);
+      cloth.renderOrder = 2;
+      backCloth.renderOrder = 2;
+      backCloth.material.opacity = 0;
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(spec.w * 0.7, spec.h * 0.28),
+        new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false, opacity: 0.45 })
+      );
+      shadow.position.set(0.03, neckY - spec.h * 0.32, -0.08);
+      shadow.renderOrder = 0;
+      group.add(shadow, support, cloth, backCloth);
+      const x = index * SPACING;
+      group.position.set(x, RAIL_Y, 0);
+      scene.add(group);
+      pieces[index] = {
+        spec: spec,
+        group: group,
+        support: support,
+        cloth: cloth,
+        backCloth: backCloth,
+        shadow: shadow,
+        maps: maps,
+        neckY: neckY,
+        homeX: x,
+        x: x,
+        scale: 1,
+        opacity: 1,
+        angle: 0,
+        frontMix: 1,
+        backMix: 0
+      };
+      placeGarments(pieces[index], 'black');
+    }));
+  }).then(start).catch(function () {
+    sheet.hidden = false;
+    sheet.innerHTML = '<h2>Gear</h2><p class="hint">The closet photos could not be loaded.</p>';
+  });
+
+  let hover = null;
   let active = null;
-  const params = new URLSearchParams(location.search);
-  const state = { color: params.get('color') === 'white' ? 'white' : 'black', size: 'M', agentName: false, agentNameText: '', backEmblem: false, qty: 1 };
+  let mode = 'rack';
+  const colorState = { color: 'black', size: 'M', agentName: false, agentNameText: '', backEmblem: false };
 
-  function pieceFor(sku, color) {
-    return pieces.filter(function (p) { return p.spec.sku === sku && p.spec.color === color; })[0];
+  function placeGarments(piece, color) {
+    const neck = piece.spec.neck[color] || piece.spec.neck.black;
+    piece.cloth.position.copy(hangPosition(piece.spec.w, piece.spec.h, neck.front, piece.neckY, 0.04));
+    piece.backCloth.position.copy(hangPosition(piece.spec.w, piece.spec.h, neck.back, piece.neckY, 0.04));
   }
 
-  function enter(piece, yaw) {
-    if (active && active !== piece) {
-      active.pivot.position.copy(active.home);
-      active.pivot.rotation.y = 0;
-    }
-    active = piece;
-    state.color = piece.spec.color;
-    controls.enabled = true;
-    controls.target.copy(piece.pivot.position);
-    if (piece.spec.model === 'cap') controls.target.y += 0.08;
-    else controls.target.y += 0.35;
-    camera.position.set(controls.target.x + 0.15, controls.target.y + 0.05, controls.target.z + 1.15);
-    if (yaw) piece.pivot.rotation.y = yaw;
-    drawSheet();
+  function applyVisuals() {
+    pieces.forEach(function (piece) {
+      piece.group.position.x += (piece.x - piece.group.position.x) * 0.18;
+      piece.group.rotation.y = 0;
+      const s = piece.group.scale.x + (piece.scale - piece.group.scale.x) * 0.18;
+      piece.group.scale.setScalar(s);
+      const frontMat = piece.cloth.material;
+      const backMat = piece.backCloth.material;
+      frontMat.opacity += (piece.frontMix * piece.opacity - frontMat.opacity) * 0.22;
+      backMat.opacity += (piece.backMix * piece.opacity - backMat.opacity) * 0.22;
+      frontMat.transparent = true;
+      backMat.transparent = true;
+      frontMat.depthWrite = frontMat.opacity > 0.85;
+      backMat.depthWrite = backMat.opacity > 0.85;
+      piece.support.material.opacity += (piece.opacity - piece.support.material.opacity) * 0.22;
+      piece.support.material.transparent = true;
+      piece.shadow.material.opacity += (0.5 * piece.opacity - piece.shadow.material.opacity) * 0.22;
+    });
   }
 
-  function leave() {
-    if (active) {
-      active.pivot.position.copy(active.home);
-      active.pivot.rotation.y = 0;
+  function layoutRack(focus) {
+    pieces.forEach(function (piece) {
+      let x = piece.homeX;
+      if (focus && focus !== piece) x += piece.homeX < focus.homeX ? -0.16 : 0.16;
+      piece.x = x;
+      piece.scale = focus === piece ? 1.18 : 1;
+      piece.opacity = 1;
+      if (mode !== 'detail') {
+        piece.angle = 0;
+        piece.frontMix = 1;
+        piece.backMix = 0;
+      }
+    });
+  }
+
+  function layoutDetail(focus) {
+    pieces.forEach(function (piece) {
+      if (piece === focus) {
+        piece.x = rackCenter - 0.42;
+        piece.scale = 1.34;
+        piece.opacity = 1;
+      } else {
+        piece.x = piece.homeX < focus.homeX ? rackCenter - 2.4 : rackCenter + 2.4;
+        piece.scale = 0.92;
+        piece.opacity = 0.12;
+        piece.frontMix = 1;
+        piece.backMix = 0;
+      }
+    });
+  }
+
+  function frame() {
+    const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
+    camera.aspect = aspect;
+    const half = Math.tan((camera.fov * Math.PI / 180) / 2);
+    const fit = function (span) { return (span / Math.max(0.5, aspect)) / (2 * half); };
+    let z = Math.max(3.6, fit(SPACING * 3 + 1.35));
+    let lookX = rackCenter;
+    let lookY = 0.08;
+    if (mode === 'detail' && aspect < 1) {
+      z = Math.max(3.3, fit(2.35));
+      lookY = 0.16;
     }
-    active = null;
-    controls.enabled = false;
-    camera.position.copy(homeCam);
-    controls.target.copy(homeTarget);
-    sheet.innerHTML = '<h2>Gear</h2><p class="hint">Hover or tap a piece, then drag to turn it.</p>';
+    camera.position.set(lookX, lookY + 0.04, z);
+    camera.lookAt(lookX, lookY, 0);
+    camera.updateProjectionMatrix();
+    renderer.setSize(stage.clientWidth, stage.clientHeight);
+  }
+
+  function turntable(angle) {
+    const a = ((angle % 360) + 360) % 360;
+    if (a < 50 || a > 310) return { front: 1, back: 0 };
+    if (a < 90) {
+      const t = (a - 50) / 40;
+      return { front: 1 - t, back: t };
+    }
+    if (a < 230) return { front: 0, back: 1 };
+    if (a < 270) {
+      const t = (a - 230) / 40;
+      return { front: t, back: 1 - t };
+    }
+    return { front: 1, back: 0 };
+  }
+
+  function applyTurn(piece) {
+    const mix = turntable(piece.angle);
+    piece.frontMix = mix.front;
+    piece.backMix = mix.back;
+    const color = colorState.color;
+    const pack = piece.maps[color];
+    const backMap = (colorState.backEmblem && pack.backEmblem) ? pack.backEmblem : pack.back;
+    if (piece.cloth.material.map !== pack.front) {
+      piece.cloth.material.map = pack.front;
+      piece.cloth.material.needsUpdate = true;
+    }
+    if (piece.backCloth.material.map !== backMap) {
+      piece.backCloth.material.map = backMap;
+      piece.backCloth.material.needsUpdate = true;
+    }
+    placeGarments(piece, color);
+  }
+
+  function showPill(piece) {
+    const product = Cat.find(piece.spec.sku);
+    const priced = Cat.priceOf(product, { color: 'black', size: 'M' });
+    pill.hidden = false;
+    pill.innerHTML = '<b>' + product.name + '</b> · ' + Cat.money(priced.unit);
+    const v = piece.group.position.clone();
+    v.y -= 0.28 * piece.group.scale.x;
+    v.project(camera);
+    pill.style.left = (v.x * 0.5 + 0.5) * stage.clientWidth + 'px';
+    pill.style.top = (-v.y * 0.5 + 0.5) * stage.clientHeight + 'px';
+  }
+
+  function hidePill() { pill.hidden = true; }
+
+  function recolor(color) {
+    colorState.color = color;
+    pieces.forEach(applyTurn);
+    if (active) drawSheet();
   }
 
   function drawSheet() {
-    if (!active) return;
     const product = Cat.find(active.spec.sku);
-    const priced = Cat.priceOf(product, state);
+    const priced = Cat.priceOf(product, colorState);
     const emblem = window.ENESMA_CATALOG.backEmblemPrice == null
       ? 'Back Emblem (Pending Price)'
       : 'Back Emblem (+' + Cat.money(window.ENESMA_CATALOG.backEmblemPrice) + ')';
-    sheet.innerHTML = '<h2>' + product.name + '</h2><p class="detail">' + product.detail + '</p>' +
-      '<p class="price">' + Cat.money(priced.unit) + '</p><p class="hint">Drag to rotate. The logo is on the front and the emblem is at the top of the back.</p>' +
-      '<div class="opt"><div class="lbl">Color</div><div class="pills"><button type="button" data-color="black" aria-pressed="' + (state.color === 'black') + '">Black</button><button type="button" data-color="white" aria-pressed="' + (state.color === 'white') + '">White</button></div></div>' +
-      '<div class="opt"><div class="lbl">Size</div><div class="pills">' + ['S', 'M', 'L', 'XL', 'XXL'].map(function (s) {
-        return '<button type="button" data-size="' + s + '" aria-pressed="' + (state.size === s) + '">' + s + '</button>';
+    sheet.hidden = false;
+    headline.hidden = true;
+    stage.parentElement.classList.add('detail');
+    sheet.innerHTML = '<p class="detail">Gear</p><h2>' + product.name + '</h2><p class="detail">' + product.detail + '</p>' +
+      '<p class="price">' + Cat.money(priced.unit) + '</p><p class="blurb">' + product.blurb + '</p>' +
+      '<p class="hint">Drag to turn it.</p>' +
+      '<div class="opt"><div class="lbl">Color</div><div class="pills">' +
+      '<button type="button" data-color="black" aria-pressed="' + (colorState.color === 'black') + '">Black</button>' +
+      '<button type="button" data-color="white" aria-pressed="' + (colorState.color === 'white') + '">White</button></div></div>' +
+      '<div class="opt"><div class="lbl">Size</div><div class="pills">' +
+      ['S', 'M', 'L', 'XL', 'XXL'].map(function (s) {
+        return '<button type="button" data-size="' + s + '" aria-pressed="' + (colorState.size === s) + '">' + s + '</button>';
       }).join('') + '</div></div>' +
-      (product.agentName ? '<label class="check"><input id="cName" type="checkbox"' + (state.agentName ? ' checked' : '') + '> Agent Name (+' + Cat.money(window.ENESMA_CATALOG.agentNamePrice) + ')</label><div class="field"><label for="cNameText">Agent Name</label><input id="cNameText" maxlength="24" value="' + (state.agentNameText || '') + '"></div>' : '') +
-      (product.backEmblem ? '<label class="check"><input id="cEmblem" type="checkbox"' + (state.backEmblem ? ' checked' : '') + '> ' + emblem + '</label>' : '') +
+      (product.agentName ? '<label class="check"><input id="cName" type="checkbox"' + (colorState.agentName ? ' checked' : '') + '> Agent Name (+' + Cat.money(window.ENESMA_CATALOG.agentNamePrice) + ')</label><div class="field"><label for="cNameText">Agent Name</label><input id="cNameText" maxlength="24" value="' + (colorState.agentNameText || '') + '"></div>' : '') +
+      (product.backEmblem ? '<label class="check"><input id="cEmblem" type="checkbox"' + (colorState.backEmblem ? ' checked' : '') + '> ' + emblem + '</label>' : '') +
       '<p class="note">One-time setup fees may apply (DTF $15 setup, embroidery $50 digitizing), confirmed by Grafek Printing.</p>' +
-      '<div class="icon-row"><button class="btn secondary" type="button" id="rotL">Rotate Left</button><button class="btn secondary" type="button" id="rotR">Rotate Right</button></div>' +
-      '<button class="btn" type="button" id="addCloset">Add To Cart</button>' +
-      '<p><button class="text-btn" type="button" id="backCloset">Back To Closet</button> · <a href="gear/' + product.id + '/">View Details</a></p>';
+      '<button class="btn" type="button" id="addCloset">Add To Bag, ' + Cat.money(priced.unit) + '</button>' +
+      '<p><button class="text-btn" type="button" id="backCloset">Back</button></p>';
     sheet.querySelectorAll('[data-color]').forEach(function (btn) {
-      btn.onclick = function () {
-        const next = pieceFor(active.spec.sku, btn.getAttribute('data-color'));
-        if (next) enter(next, active.pivot.rotation.y);
-      };
+      btn.onclick = function () { recolor(btn.getAttribute('data-color')); };
     });
     sheet.querySelectorAll('[data-size]').forEach(function (btn) {
-      btn.onclick = function () { state.size = btn.getAttribute('data-size'); drawSheet(); };
+      btn.onclick = function () { colorState.size = btn.getAttribute('data-size'); drawSheet(); };
     });
     const nameBox = document.getElementById('cName');
-    if (nameBox) nameBox.onchange = function () {
-      state.agentName = nameBox.checked;
-      applyName();
-      drawSheet();
-    };
+    if (nameBox) nameBox.onchange = function () { colorState.agentName = nameBox.checked; drawSheet(); };
     const nameText = document.getElementById('cNameText');
-    if (nameText) nameText.oninput = function () { state.agentNameText = nameText.value; applyName(); };
+    if (nameText) nameText.oninput = function () { colorState.agentNameText = nameText.value; };
     const emblemBox = document.getElementById('cEmblem');
-    if (emblemBox) emblemBox.onchange = function () { state.backEmblem = emblemBox.checked; };
-    document.getElementById('rotL').onclick = function () { active.pivot.rotation.y -= 0.45; };
-    document.getElementById('rotR').onclick = function () { active.pivot.rotation.y += 0.45; };
+    if (emblemBox) emblemBox.onchange = function () {
+      colorState.backEmblem = emblemBox.checked;
+      if (active) applyTurn(active);
+    };
     document.getElementById('backCloset').onclick = leave;
     document.getElementById('addCloset').onclick = function () {
       Cart.add(product.id, {
-        color: state.color,
-        size: state.size,
-        agentName: state.agentName,
-        agentNameText: state.agentNameText,
-        backEmblem: state.backEmblem
+        color: colorState.color,
+        size: colorState.size,
+        agentName: colorState.agentName,
+        agentNameText: colorState.agentNameText,
+        backEmblem: colorState.backEmblem
       }, 1);
       UI.openCart();
     };
   }
 
-  function applyName() {
-    if (!active) return;
-    const show = state.agentName && state.agentNameText.trim();
-    active.pivot.traverse(function (node) {
-      if (node.name === 'decal-name') node.visible = !!show;
-      if (node.name === 'decal-name' && show && node.material && node.material.map) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024; canvas.height = 200;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, 1024, 200);
-        ctx.fillStyle = state.color === 'black' ? '#f7f7f5' : '#141418';
-        ctx.font = '600 86px Inter, Helvetica, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(state.agentNameText.toUpperCase(), 512, 104);
-        node.material.map.image = canvas;
-        node.material.map.needsUpdate = true;
-      }
-    });
+  function enter(piece) {
+    active = piece;
+    hover = null;
+    mode = 'detail';
+    hidePill();
+    piece.angle = 0;
+    applyTurn(piece);
+    layoutDetail(piece);
+    drawSheet();
+    frame();
+  }
+
+  function leave() {
+    active = null;
+    mode = 'rack';
+    sheet.hidden = true;
+    headline.hidden = false;
+    stage.parentElement.classList.remove('detail');
+    hidePill();
+    layoutRack(null);
+    frame();
   }
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  let hoverTimer = 0;
   function pick(ev) {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(scene.children, true);
-    for (let i = 0; i < hits.length; i++) {
-      let node = hits[i].object;
-      while (node && !node.userData.piece) node = node.parent;
-      if (node && node.userData.piece) return pieces.filter(function (p) { return p.pivot === node; })[0];
-    }
-    return null;
-  }
-  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  if (!coarse) {
-    renderer.domElement.addEventListener('pointermove', function (ev) {
-      if (active) return;
-      const piece = pick(ev);
-      clearTimeout(hoverTimer);
-      if (!piece) return;
-      hoverTimer = setTimeout(function () { enter(piece, 0.2); }, 180);
+    const hits = raycaster.intersectObjects(pieces.map(function (p) { return p.cloth; }), false);
+    if (!hits.length) return null;
+    let best = null;
+    let bestD = 1e9;
+    hits.forEach(function (hit) {
+      const piece = pieces.filter(function (p) { return p.cloth === hit.object; })[0];
+      const d = Math.abs(hit.point.x - piece.group.position.x);
+      if (d < bestD) { bestD = d; best = piece; }
     });
+    return best;
   }
-  renderer.domElement.addEventListener('pointerup', function (ev) {
-    if (ev.pointerType === 'mouse' && active) return;
+
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', function (ev) {
+    down = { x: ev.clientX, y: ev.clientY, moved: false, piece: pick(ev) };
+    renderer.domElement.setPointerCapture(ev.pointerId);
+  });
+  renderer.domElement.addEventListener('pointermove', function (ev) {
+    if (down && mode === 'detail' && active) {
+      const dx = ev.clientX - down.x;
+      if (Math.abs(dx) > 4) down.moved = true;
+      active.angle = dx * 0.7;
+      applyTurn(active);
+      return;
+    }
+    if (mode !== 'rack') return;
     const piece = pick(ev);
-    if (piece) enter(piece, 0.35);
+    hover = piece;
+    layoutRack(piece);
+    if (piece) showPill(piece);
+    else hidePill();
+  });
+  renderer.domElement.addEventListener('pointerup', function (ev) {
+    if (!down) return;
+    const piece = down.piece;
+    const dragged = down.moved;
+    down = null;
+    if (dragged && mode === 'detail') return;
+    if (mode === 'rack' && piece) enter(piece);
+    else if (mode === 'detail' && piece && piece !== active) enter(piece);
+    else if (mode === 'detail' && !piece) leave();
   });
 
-  const requested = params.get('item');
-  if (requested) {
-    const start = pieceFor(requested, state.color) || pieces.filter(function (p) { return p.spec.sku === requested; })[0];
-    if (start) enter(start, Number(params.get('yaw') || 0.8));
+  window.addEventListener('resize', frame);
+
+  function start() {
+    layoutRack(null);
+    frame();
+    (function loop() {
+      applyVisuals();
+      if (hover && mode === 'rack') showPill(hover);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    })();
   }
-
-  window.addEventListener('resize', function () {
-    camera.aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
-    camera.updateProjectionMatrix();
-    renderer.setSize(stage.clientWidth, stage.clientHeight);
-  });
-
-  (function loop() {
-    controls.update();
-    if (!active) camera.position.x = homeCam.x + Math.sin(performance.now() / 4000) * 0.08;
-    renderer.render(scene, camera);
-    requestAnimationFrame(loop);
-  })();
 }
 
-function buildRoom(scene) {
-  const wood = woodTexture();
-  const floorMat = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.62, metalness: 0.05, color: '#3a2416' });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#1a1714', roughness: 0.9 });
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(8, 4), wallMat);
-  back.position.set(0, 1.8, -2.2);
-  scene.add(back);
-  const shelfMat = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.5, metalness: 0.04, color: '#6b4528' });
-  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.045, 0.38), shelfMat);
-  shelf.position.set(-1.55, 0.86, -0.85);
-  shelf.castShadow = true;
-  shelf.receiveShadow = true;
-  const shelf2 = shelf.clone();
-  shelf2.position.y = 1.14;
-  scene.add(shelf, shelf2);
-  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 3.3, 16), new THREE.MeshStandardMaterial({ color: '#2a2a2e', metalness: 0.7, roughness: 0.35 }));
-  rail.rotation.z = Math.PI / 2;
-  rail.position.set(0, 1.62, -1.05);
-  scene.add(rail);
-}
-
-function addHanger(scene, x, y, z) {
-  const mat = new THREE.MeshStandardMaterial({ color: '#c2b8a2', metalness: 0.65, roughness: 0.35 });
-  const pts = [
-    new THREE.Vector3(0, 0.12, 0),
-    new THREE.Vector3(0.02, 0.16, 0),
-    new THREE.Vector3(0.0, 0.2, 0),
-    new THREE.Vector3(-0.03, 0.16, 0),
-    new THREE.Vector3(0, 0.12, 0),
-    new THREE.Vector3(-0.16, 0.02, 0),
-    new THREE.Vector3(0.16, 0.02, 0),
-    new THREE.Vector3(0, 0.12, 0)
-  ];
-  const curve = new THREE.CatmullRomCurve3(pts);
-  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.0045, 6, false), mat);
-  mesh.position.set(x, y - 0.16, z);
-  scene.add(mesh);
-}
-
-function woodTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const g = canvas.getContext('2d');
-  g.fillStyle = '#5a3822';
-  g.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 90; i++) {
-    g.strokeStyle = 'rgba(40,22,10,' + (0.15 + (i % 5) * 0.06) + ')';
-    g.lineWidth = 1 + (i % 3);
-    g.beginPath();
-    const y = (i * 17) % 512;
-    g.moveTo(0, y);
-    g.bezierCurveTo(140, y + 18, 300, y - 14, 512, y + 6);
-    g.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+function metalTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 32;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 256, 0);
+  grd.addColorStop(0.00, '#4a4e54');
+  grd.addColorStop(0.16, '#f4f5f6');
+  grd.addColorStop(0.30, '#7c8288');
+  grd.addColorStop(0.48, '#1c1e22');
+  grd.addColorStop(0.70, '#121316');
+  grd.addColorStop(0.86, '#3a3e44');
+  grd.addColorStop(1.00, '#4a4e54');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 256, 32);
+  const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
   return tex;
 }
+
+if (document.getElementById('stage')) boot();

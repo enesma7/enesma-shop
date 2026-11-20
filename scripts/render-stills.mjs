@@ -64,15 +64,29 @@ for (const color of colors) {
     const id = product === 'plastic' ? 'for-sale-plastic'
       : product === 'aluminum' ? 'for-sale-aluminum'
         : product === 'open-house' ? 'open-house' : 'a-frame';
-    jobs.push({
-      file: id + '-' + color + '-hero',
-      job: { kind: 'sign', product: product === 'plastic' ? 'plastic' : product === 'aluminum' ? 'aluminum' : product, color, width: 1600, height: 2000, yaw: 0.46 }
-    });
+    const job = {
+      kind: 'sign',
+      product: product === 'plastic' ? 'plastic' : product === 'aluminum' ? 'aluminum' : product,
+      color,
+      width: 1600,
+      height: 2000,
+      yaw: 0.46
+    };
+    if (product === 'open-house') {
+      job.width = 2400;
+      job.height = 1600;
+      job.yaw = 0.18;
+      job.fill = 0.9;
+    } else if (product === 'a-frame') {
+      job.width = 1800;
+      job.height = 2250;
+      job.yaw = 0.78;
+      job.fill = 0.82;
+      job.lift = 0.22;
+      job.background = '#f3f1ec';
+    }
+    jobs.push({ file: id + '-' + color + '-hero', job });
   }
-  jobs.push({
-    file: 'cards-500-' + color + '-hero',
-    job: { kind: 'cards', color, stack: '500', layers: 8, width: 1600, height: 1200, yaw: 0.65 }
-  });
   jobs.push({
     file: 'cards-1000-' + color + '-hero',
     job: { kind: 'cards', color, stack: '1000', layers: 14, width: 1600, height: 1200, yaw: 0.7 }

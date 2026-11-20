@@ -106,15 +106,18 @@ h1, h2, h3, p { text-wrap: pretty; }
 .grid { display: grid; gap: 22px 14px; grid-template-columns: 1fr 1fr; }
 .card { text-decoration: none; display: block; }
 .card .ph { background: #f3f2ef; aspect-ratio: 4/5; overflow: hidden; }
+.card .ph.natural { aspect-ratio: auto; }
 .card .ph picture, .tile picture { display: block; height: 100%; }
+.card .ph.natural picture { height: auto; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .card img { width: 100%; height: 100%; object-fit: cover; }
+.card .ph.natural img { height: auto; object-fit: contain; }
 .card h2 { font-size: 16px; font-weight: 500; margin: 10px 0 0; }
 .card p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 
 .product { display: grid; gap: 8px; }
 .gallery { background: #f4f3f0; }
-.gallery img { width: 100%; height: auto; }
+.gallery img { width: 100%; height: auto; object-fit: contain; }
 .buy { padding: 8px 16px 28px; max-width: 560px; }
 .buy h1 { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; margin: 12px 0 0; }
 .buy .detail { color: var(--muted); margin: 4px 0 0; }
@@ -162,7 +165,7 @@ h1, h2, h3, p { text-wrap: pretty; }
 .drawer header h2 { margin: 0; font-size: 20px; font-weight: 500; }
 .drawer .lines { overflow: auto; flex: 1; padding: 0 16px; }
 .line { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
-.line img { width: 84px; height: 104px; object-fit: cover; background: #f3f2ef; }
+.line img { width: 84px; height: 104px; object-fit: contain; background: #f3f2ef; }
 .line h3 { margin: 0; font-size: 15px; font-weight: 500; }
 .line p { margin: 4px 0; color: var(--muted); font-size: 13px; }
 .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; }
@@ -187,8 +190,26 @@ h1, h2, h3, p { text-wrap: pretty; }
 
 .hp { position: absolute; left: -9999px; height: 0; overflow: hidden; }
 
-.closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #0c0c10; color: var(--white); }
-.stage { position: relative; height: 62vh; min-height: 320px; background: #0c0c10; }
+.closet { display: flex; flex-direction: column; min-height: calc(100vh - var(--header)); background: #f4f2ee; color: #141418; }
+.stage { position: relative; height: 70vh; min-height: 420px; background: #f4f2ee; }
+.closet-headline {
+  position: absolute; z-index: 2; left: 22px; top: 28px; max-width: 11ch;
+  margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.02;
+  pointer-events: none;
+}
+.pill {
+  position: absolute; z-index: 3; transform: translate(-50%, -130%);
+  background: #000007; color: #fbfbfb; border-radius: 999px; padding: 8px 14px;
+  font-size: 14px; line-height: 1.2; pointer-events: none; white-space: nowrap;
+}
+.pill b { font-weight: 500; }
+.sheet[hidden], .closet-headline[hidden] { display: none; }
+.closet.detail .sheet {
+  display: flex; flex-direction: column; position: absolute; z-index: 4;
+  top: 0; right: 0; bottom: 0; width: min(420px, 100%);
+  margin: 0; border-radius: 0; background: #fff;
+  box-shadow: -16px 0 40px rgba(0, 0, 7, 0.08); overflow: auto;
+}
 .stage canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 .sheet {
   background: var(--paper); color: var(--black); border-radius: 18px 18px 0 0;
@@ -232,4 +253,11 @@ h1, h2, h3, p { text-wrap: pretty; }
 
 @media (max-width: 759px) {
   .drawer { width: 100%; }
+  .closet-headline { top: auto; bottom: 18px; font-size: 28px; text-shadow: 0 1px 0 #f4f2ee; }
+  .closet.detail { flex-direction: column; }
+  .closet.detail .stage { height: 54vh; min-height: 320px; flex: none; }
+  .closet.detail .sheet {
+    position: relative; inset: auto; width: 100%; height: auto; max-height: 46vh;
+    box-shadow: none;
+  }
 }

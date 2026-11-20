@@ -6,8 +6,9 @@
 
   function picture(id, color, view, alt) {
     var base = Cat.renderBase(id, color, view);
+    var size = Cat.imageSize(id);
     return '<picture><source srcset="' + base + '.webp" type="image/webp">' +
-      '<img src="' + base + '.jpg" alt="' + h(alt) + '" width="1600" height="2000"></picture>';
+      '<img src="' + base + '.jpg" alt="' + h(alt) + '" width="' + size.w + '" height="' + size.h + '"></picture>';
   }
 
   function home() {
@@ -29,7 +30,8 @@
     var cards = Cat.byCategory(cat).map(function (p) {
       var priced = Cat.priceOf(p, { color: 'black' });
       var href = cat + '/' + p.id + '/';
-      return '<a class="card" href="' + href + '"><div class="ph">' + picture(p.id, 'black', 'hero', p.name) + '</div>' +
+      var fit = (p.category === 'signs' || p.category === 'cards') ? ' natural' : '';
+      return '<a class="card" href="' + href + '"><div class="ph' + fit + '">' + picture(p.id, 'black', 'hero', p.name) + '</div>' +
         '<h2>' + h(p.name) + '</h2><p>' + h(p.detail) + '</p><p>' + (p.variants ? 'From ' : '') + Cat.money(priced.from) + '</p></a>';
     }).join('');
     UI.$('#content').innerHTML = '<section class="section"><h1>' + h(title) + '</h1><p class="lede">' + h(lede) + '</p><div class="grid">' + cards + '</div></section>';
@@ -303,7 +305,7 @@
       document.title = 'Gear · ENESMA Shop';
       var stage = document.createElement('div');
       stage.className = 'closet';
-      stage.innerHTML = '<div class="stage" id="stage"></div><aside class="sheet" id="sheet"><h2>Gear</h2><p class="hint">Hover or tap a piece, then drag to turn it.</p></aside>';
+      stage.innerHTML = '<div class="stage" id="stage"><h1 class="closet-headline" id="closetHeadline">ENESMA Gear. Built For Agents.</h1><div class="pill" id="pill" hidden></div></div><aside class="sheet" id="sheet" hidden></aside>';
       UI.$('#content').appendChild(stage);
       import(window.SHOP_BASE + 'js/closet.js').catch(function () { showFallback(); });
     } else if (page === 'admin') {

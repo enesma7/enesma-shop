@@ -10,6 +10,7 @@ OUT = os.path.join(ROOT, "assets/signs")
 os.makedirs(OUT, exist_ok=True)
 
 FONT_B = "/usr/share/fonts/truetype/macos/Inter-Bold.ttf"
+FONT_SB = "/usr/share/fonts/truetype/macos/Inter-SemiBold.ttf"
 FONT_M = "/usr/share/fonts/truetype/macos/Inter-Medium.ttf"
 FONT_R = "/usr/share/fonts/truetype/macos/Inter-Regular.ttf"
 
@@ -68,79 +69,129 @@ def illyrian_ring(diameter, thickness):
     return im
 
 
-def for_sale(dark=False, material="Plastic"):
+def illyrian_rule(width, thickness):
+    """Hairline, #EF0207 on the left into #9A0007 on the right."""
+    width = max(1, int(width))
+    thickness = max(1, int(thickness))
+    im = Image.new("RGBA", (width, thickness), (0, 0, 0, 0))
+    px = im.load()
+    for x in range(width):
+        t = x / max(1, width - 1)
+        color = (
+            int(round(239 + (154 - 239) * t)),
+            int(round(2 + (0 - 2) * t)),
+            7,
+            255,
+        )
+        for y in range(thickness):
+            px[x, y] = color
+    return im
+
+
+def for_sale(dark=False, material=None):
+    """18x24 For Sale face. Plastic and Aluminum share this artwork."""
     W, H = 1800, 2400
     bg = (12, 12, 14, 255) if dark else (248, 248, 246, 255)
     fg = (248, 248, 246, 255) if dark else (10, 10, 12, 255)
-    muted = (180, 180, 184, 255) if dark else (70, 70, 74, 255)
     im = Image.new("RGBA", (W, H), bg)
     d = ImageDraw.Draw(im)
     logo = Image.open(LOGO_W if dark else LOGO_B)
     paste_logo(im, logo, W / 2, 160, 860)
     f = font(FONT_B, 168)
     text = "FOR SALE"
-    gap = 28
+    sale_gap = 28
     widths = [d.textlength(ch, font=f) for ch in text]
-    total = sum(widths) + gap * (len(text) - 1)
+    total = sum(widths) + sale_gap * (len(text) - 1)
     x = (W - total) / 2
     y = 620
     for ch, wch in zip(text, widths):
         d.text((x, y), ch, font=f, fill=fg)
-        x += wch + gap
-    label_f = font(FONT_M, 36)
-    label = material
-    lw = d.textlength(label, font=label_f)
-    d.text((W - 90 - lw, 168), label, font=label_f, fill=muted)
-    # Full-length placeholder stays on the left. The name fills the right column.
+        x += wch + sale_gap
+    # Full-length placeholder stays on the left.
     agent = cutout_agent(980)
     ax, ay = 70, H - agent.height - 70
     im.alpha_composite(agent, (ax, ay))
-    # About 43% of the 18 inch width: the largest name that stays in the right half
-    # with a 5% edge margin. That is roughly a 2 inch cap height, the street-readable
-    # size used on 18x24 panels when the name cannot span the whole board.
-    target = W * 0.43
-    lo, hi, name_face = 80, 420, font(FONT_B, 80)
-    while lo <= hi:
-        mid = (lo + hi) // 2
-        face = font(FONT_B, mid)
-        if d.textlength("AGENT", font=face) <= target:
-            name_face = face
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    name_w = d.textlength("AGENT", font=name_face)
-    phone = "(000) 000-0000"
-    lo, hi, phone_face = 24, name_face.size, font(FONT_M, 24)
-    while lo <= hi:
-        mid = (lo + hi) // 2
-        face = font(FONT_M, mid)
-        if d.textlength(phone, font=face) <= name_w:
-            phone_face = face
-            lo = mid + 1
-        else:
-            hi = mid - 1
+
+    # Name matches the FOR SALE headline: Inter, uppercase, tracked.
+    # SemiBold (600) instead of Bold, so it stays street-readable without the heavy block.
+    # "AGENT NAME" at that size is wider than the column beside the photo, so it wraps.
     right = int(W * 0.95)
-    gap = int(name_face.size * 0.16)
+    breath = int(W * 0.035)
+    max_w = right - (ax + agent.width + breath)
+    headline = 168
+    name_track = 0.10
+    name_size = headline
+    name_face = font(FONT_SB, name_size)
+    name_gap = name_size * name_track
+    agent_w, _ = tracked_width(d, "AGENT", name_face, name_gap)
+    name_w, _ = tracked_width(d, "NAME", name_face, name_gap)
+    full_w, _ = tracked_width(d, "AGENT NAME", name_face, name_gap)
+    one_line = full_w <= max_w
+    if not one_line and max(agent_w, name_w) > max_w:
+        lo, hi = 80, headline
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            face = font(FONT_SB, mid)
+            gap = mid * name_track
+            widest = max(
+                tracked_width(d, "AGENT", face, gap)[0],
+                tracked_width(d, "NAME", face, gap)[0],
+            )
+            if widest <= max_w:
+                name_size = mid
+                name_face = face
+                name_gap = gap
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        agent_w, _ = tracked_width(d, "AGENT", name_face, name_gap)
+        name_w, _ = tracked_width(d, "NAME", name_face, name_gap)
 
-    def line_height(text, face):
-        box = d.textbbox((0, 0), text, font=face)
-        return box[3] - box[1]
+    # Phone is 58% of the name cap height, Regular (400), with its own tracking.
+    phone = "(000) 000-0000"
+    phone_size = max(1, round(name_size * 0.58))
+    phone_track = 0.08
+    phone_face = font(FONT_R, phone_size)
+    phone_gap = phone_size * phone_track
+    phone_w, _ = tracked_width(d, phone, phone_face, phone_gap)
+    while phone_w > max_w and phone_track > 0.02:
+        phone_track = round(phone_track - 0.01, 2)
+        phone_gap = phone_size * phone_track
+        phone_w, _ = tracked_width(d, phone, phone_face, phone_gap)
 
-    block_h = line_height("AGENT", name_face) + gap + line_height("NAME", name_face) + gap + line_height(phone, phone_face)
+    lines = ["AGENT NAME"] if one_line else ["AGENT", "NAME"]
+    line_ws = [full_w] if one_line else [agent_w, name_w]
+    block_w = max(line_ws + [phone_w])
+    # About 2.5px when this 1800px-wide art is shown on a 390px phone.
+    rule_h = max(2, round(2.5 * W / 390))
+    rule_w = max(1, int(round(block_w * 0.40)))
+    name_box = d.textbbox((0, 0), "AGENT", font=name_face)
+    phone_box = d.textbbox((0, 0), "000", font=phone_face)
+    line_step = name_size * 1.12
+    after_name = name_size * 0.26
+    before_phone = name_size * 0.30
+    ink_top = name_box[1]
+    name_ink_bottom = (len(lines) - 1) * line_step + name_box[3]
+    rule_y = name_ink_bottom + after_name
+    phone_y = rule_y + rule_h + before_phone - phone_box[1]
+    ink_bottom = phone_y + phone_box[3]
+    block_h = ink_bottom - ink_top
     photo_mid = ay + agent.height / 2
-    top = int(photo_mid - block_h / 2)
-    # Stay clear of the FOR SALE line and the DRE line.
-    top = max(top, 980)
-    top = min(top, H - 150 - block_h)
+    top = photo_mid - block_h / 2 - ink_top
+    # Stay clear of FOR SALE and the DRE line.
+    top = max(top, 900)
+    top = min(top, H - 150 - (ink_bottom - ink_top) - ink_top)
 
-    def draw_right(text, face, y):
-        tw = d.textlength(text, font=face)
-        d.text((right - tw, y), text, font=face, fill=fg)
-        return d.textbbox((right - tw, y), text, font=face)[3]
-
-    y = draw_right("AGENT", name_face, top) + gap
-    y = draw_right("NAME", name_face, y) + gap
-    draw_right(phone, phone_face, y)
+    y = top
+    for line, _lw in zip(lines, line_ws):
+        draw_tracked(d, line, name_face, right - tracked_width(d, line, name_face, name_gap)[0], y, fg, name_gap)
+        y += line_step
+    rule = illyrian_rule(rule_w, rule_h)
+    im.alpha_composite(rule, (int(right - rule_w), int(round(top + rule_y))))
+    draw_tracked(
+        d, phone, phone_face,
+        right - phone_w, top + phone_y, fg, phone_gap,
+    )
     dre = "DRE# 00000000"
     df = font(FONT_R, 30)
     dw = d.textlength(dre, font=df)
@@ -260,12 +311,11 @@ def open_house(dark=False):
 def main():
     renders = os.path.join(ROOT, "assets/renders")
     os.makedirs(renders, exist_ok=True)
+    # Open House is approved and is not rewritten here.
     for dark, name in ((False, "white"), (True, "black")):
-        open_house(dark).convert("RGB").save(os.path.join(OUT, f"open-house-{name}.png"), quality=95)
-        for material, kind in (("Plastic", "for-sale-plastic"), ("Aluminum", "for-sale-aluminum")):
-            art = for_sale(dark, material).convert("RGB")
-            if material == "Plastic":
-                art.save(os.path.join(OUT, f"for-sale-{name}.png"), quality=95)
+        art = for_sale(dark).convert("RGB")
+        art.save(os.path.join(OUT, f"for-sale-{name}.png"), quality=95)
+        for kind in ("for-sale-plastic", "for-sale-aluminum"):
             base = os.path.join(renders, f"{kind}-{name}-hero")
             art.save(base + ".jpg", quality=92, optimize=True)
             art.save(base + ".webp", quality=86, method=4)

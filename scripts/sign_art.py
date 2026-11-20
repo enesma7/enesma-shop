@@ -42,24 +42,28 @@ def paste_logo(canvas, logo, cx, y, width):
     return h
 
 def illyrian_ring(diameter, thickness):
-    """Open ring in the Illyrian Red gradient, #EF0207 into #9A0007."""
+    """Open ring. Left of the stroke is #EF0207, right is #9A0007."""
     im = Image.new("RGBA", (diameter, diameter), (0, 0, 0, 0))
     px = im.load()
     c = (diameter - 1) / 2.0
-    outer = diameter / 2.0 - 1.5
+    outer = diameter / 2.0 - 2
     inner = outer - thickness
     for y in range(diameter):
         for x in range(diameter):
-            dist = ((x - c) ** 2 + (y - c) ** 2) ** 0.5
-            if inner - 1.4 <= dist <= outer + 1.4:
+            dx = x - c
+            dy = y - c
+            dist = (dx * dx + dy * dy) ** 0.5
+            if inner - 1.6 <= dist <= outer + 1.6:
                 fade = 1.0
                 if dist > outer:
-                    fade = max(0.0, 1 - (dist - outer) / 1.4)
+                    fade = max(0.0, 1 - (dist - outer) / 1.6)
                 elif dist < inner:
-                    fade = max(0.0, 1 - (inner - dist) / 1.4)
-                t = x / max(1, diameter - 1)
-                r = int(239 + (154 - 239) * t)
-                g = int(2 + (0 - 2) * t)
+                    fade = max(0.0, 1 - (inner - dist) / 1.6)
+                # 1 on the left of the ring, 0 on the right. Steep so both reds read.
+                u = (1 - (dx / max(dist, 0.001))) / 2
+                t = max(0.0, min(1.0, (u - 0.12) / 0.76))
+                r = int(154 + (239 - 154) * t)
+                g = int(2 * t)
                 px[x, y] = (r, g, 7, int(255 * fade))
     return im
 
@@ -91,8 +95,8 @@ def for_sale(dark=False, material="Plastic"):
     agent = cutout_agent(980)
     ax, ay = 70, H - agent.height - 70
     im.alpha_composite(agent, (ax, ay))
-    ring_d = 188
-    ring = illyrian_ring(ring_d, 14)
+    ring_d = 220
+    ring = illyrian_ring(ring_d, 28)
     rx = 1088
     ry = ay + 90
     im.alpha_composite(ring, (rx, ry))

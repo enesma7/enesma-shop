@@ -91,27 +91,56 @@ def for_sale(dark=False, material="Plastic"):
     label = material
     lw = d.textlength(label, font=label_f)
     d.text((W - 90 - lw, 168), label, font=label_f, fill=muted)
-    # Standing placeholder stays on the left. The name, phone, and ring sit in the right half.
+    # Full-length placeholder stays on the left. The name fills the right column.
     agent = cutout_agent(980)
     ax, ay = 70, H - agent.height - 70
     im.alpha_composite(agent, (ax, ay))
-    ring_d = 220
-    ring = illyrian_ring(ring_d, 28)
-    rx = 1088
-    ry = ay + 90
-    im.alpha_composite(ring, (rx, ry))
-    nx = rx + ring_d + 40
-    ny = ry + 6
-    d.text((nx, ny), "AGENT", font=font(FONT_B, 64), fill=fg)
-    name_f = font(FONT_B, 52)
-    letters = "NAME"
-    widths = [d.textlength(ch, font=name_f) for ch in letters]
-    gapn = 12
-    xx = nx
-    for ch, wch in zip(letters, widths):
-        d.text((xx, ny + 78), ch, font=name_f, fill=fg)
-        xx += wch + gapn
-    d.text((nx, ny + 156), "(000) 000-0000", font=font(FONT_M, 32), fill=fg)
+    # About 43% of the 18 inch width: the largest name that stays in the right half
+    # with a 5% edge margin. That is roughly a 2 inch cap height, the street-readable
+    # size used on 18x24 panels when the name cannot span the whole board.
+    target = W * 0.43
+    lo, hi, name_face = 80, 420, font(FONT_B, 80)
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        face = font(FONT_B, mid)
+        if d.textlength("AGENT", font=face) <= target:
+            name_face = face
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    name_w = d.textlength("AGENT", font=name_face)
+    phone = "(000) 000-0000"
+    lo, hi, phone_face = 24, name_face.size, font(FONT_M, 24)
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        face = font(FONT_M, mid)
+        if d.textlength(phone, font=face) <= name_w:
+            phone_face = face
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    right = int(W * 0.95)
+    gap = int(name_face.size * 0.16)
+
+    def line_height(text, face):
+        box = d.textbbox((0, 0), text, font=face)
+        return box[3] - box[1]
+
+    block_h = line_height("AGENT", name_face) + gap + line_height("NAME", name_face) + gap + line_height(phone, phone_face)
+    photo_mid = ay + agent.height / 2
+    top = int(photo_mid - block_h / 2)
+    # Stay clear of the FOR SALE line and the DRE line.
+    top = max(top, 980)
+    top = min(top, H - 150 - block_h)
+
+    def draw_right(text, face, y):
+        tw = d.textlength(text, font=face)
+        d.text((right - tw, y), text, font=face, fill=fg)
+        return d.textbbox((right - tw, y), text, font=face)[3]
+
+    y = draw_right("AGENT", name_face, top) + gap
+    y = draw_right("NAME", name_face, y) + gap
+    draw_right(phone, phone_face, y)
     dre = "DRE# 00000000"
     df = font(FONT_R, 30)
     dw = d.textlength(dre, font=df)

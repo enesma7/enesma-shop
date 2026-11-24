@@ -96,14 +96,14 @@ function boot() {
   }
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
   function makeTex(img) {
-    const tex = new THREE.Texture(img);
+    const tex = new THREE.Texture(img.texData || img);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = maxAniso;
     // Mipmaps average the white background into the sleeve hem and draw it as a gray shelf.
     tex.generateMipmaps = false;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
-    tex.premultiplyAlpha = true;
+    tex.premultiplyAlpha = !img.texData;
     tex.needsUpdate = true;
     return tex;
   }
@@ -205,12 +205,45 @@ function boot() {
       }
     }
     ctx.putImageData(image, 0, 0);
+    // A canvas keeps no color under alpha 0, so filtering at the cutout edge
+    // blends the cloth toward black and a white hem picks up a dark dashed
+    // line. Carry the cloth color a few pixels past the edge and upload these
+    // straight-alpha pixels as the texture instead.
+    for (let pass = 0; pass < 3; pass++) {
+      const prev = new Uint8ClampedArray(px);
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const o = (y * w + x) * 4;
+          if (prev[o + 3] > 0 || prev[o] || prev[o + 1] || prev[o + 2]) continue;
+          let r = 0, g = 0, b = 0, n = 0;
+          const near = [o - 4, o + 4, o - w * 4, o + w * 4];
+          for (let k = 0; k < 4; k++) {
+            const q = near[k];
+            if (prev[q + 3] > 140 || (prev[q + 3] === 0 && (prev[q] || prev[q + 1] || prev[q + 2]))) {
+              r += prev[q]; g += prev[q + 1]; b += prev[q + 2]; n++;
+            }
+          }
+          if (n) { px[o] = r / n; px[o + 1] = g / n; px[o + 2] = b / n; }
+        }
+      }
+    }
+    canvas.texData = image;
     return canvas;
   }
 
   function garmentMesh(frontImg, backImg, spec) {
     const frontSrc = sealSlits(frontImg);
     const backSrc = sealSlits(backImg);
+    // The back photo hangs a little differently. Where the front is cut away
+    // but the back is not, the back cloth showed through from the front as a
+    // stray scrap under a sleeve or hem. Trim the back to the front outline.
+    const fd = frontSrc.texData;
+    const bd = backSrc.texData;
+    if (fd && bd && fd.width === bd.width && fd.height === bd.height) {
+      for (let i = 3; i < fd.data.length; i += 4) {
+        if (fd.data[i] <= 140) bd.data[i] = 0;
+      }
+    }
     const maxMask = 480;
     const sc = maxMask / Math.max(frontImg.width, frontImg.height);
     const iw = Math.max(8, Math.round(frontImg.width * sc));
@@ -221,16 +254,9 @@ function boot() {
     const mctx = mask.getContext('2d', { willReadFrequently: true });
     mctx.drawImage(frontSrc, 0, 0, iw, ih);
     const frontPx = mctx.getImageData(0, 0, iw, ih).data;
-    mctx.clearRect(0, 0, iw, ih);
-    mctx.drawImage(backSrc, 0, 0, iw, ih);
-    const backPx = mctx.getImageData(0, 0, iw, ih).data;
-    // Front and back photos are not the same outline. The front sleeve hangs
-    // past the back sleeve, and that extra cloth shows through as a notch
-    // under the cuff. Keep only the pixels that are cloth on both sides.
-    const data = new Uint8ClampedArray(frontPx);
-    for (let i = 3; i < data.length; i += 4) {
-      if (!(frontPx[i] > 140 && backPx[i] > 140)) data[i] = 0;
-    }
+    // The mesh follows the front photo. The back photo is trimmed to the same
+    // outline in its texture, so nothing of it shows past the front cutout.
+    const data = frontPx;
     const step = 2;
     const samples = [];
     let minY = ih;
@@ -289,15 +315,12 @@ function boot() {
     }
     samples.length = 0;
     eased.forEach(function (row) { samples.push(row); });
-    let centerSum = 0;
-    samples.forEach(function (s) { centerSum += (s.l + s.r) / 2; });
-    const center = centerSum / Math.max(1, samples.length);
+    // Each row stays where it is in the photo. Centering every row on its own
+    // shifted the print row by row, which tore the collar, banded the polo at
+    // the sleeve line and hung the cuff under the hem as a stray tab.
     samples.forEach(function (s) {
-      const half = (s.r - s.l) / 2;
       s.ol = s.l;
       s.or = s.r;
-      s.l = center - half;
-      s.r = center + half;
     });
     const opaque = Math.max(1, maxY - minY);
     const worldH = spec.tall * (ih / opaque);
@@ -327,11 +350,14 @@ function boot() {
       const vNorm = (s.y - minY) / opaque;
       for (let i = 0; i <= cols; i++) {
         const t = i / cols;
-        const inset = Math.min(3, (s.r - s.l) * 0.02);
+        // The mesh reaches a little past the cutout, so the photo's own alpha
+        // draws the outline instead of the stair-stepped row ends.
+        const insetL = -1.5;
+        const insetR = -1.5;
         const ol = s.ol == null ? s.l : s.ol;
         const orr = s.or == null ? s.r : s.or;
-        const px = (s.l + inset) + (s.r - s.l - inset * 2) * t;
-        const pxUv = (ol + inset) + (orr - ol - inset * 2) * t;
+        const px = (s.l + insetL) + (s.r - s.l - insetL - insetR) * t;
+        const pxUv = (ol + insetL) + (orr - ol - insetL - insetR) * t;
         const u = pxUv / iw;
         const v = 1 - (s.y + 0.5) / ih;
         const x = (px / iw - 0.5) * worldW;
@@ -561,7 +587,7 @@ function boot() {
     const group = new THREE.Group();
     const width = 0.46;
     const views = images.map(function (img) {
-      const tex = new THREE.Texture(img);
+      const tex = new THREE.Texture(img.texData || img);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = maxAniso;
       tex.needsUpdate = true;

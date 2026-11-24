@@ -25,10 +25,10 @@
       '</div>';
   }
   function tile(href, file, label) {
-    return '<a class="tile ' + file + '" href="' + href + '"><picture>' +
-      '<source media="(max-width: 759px)" srcset="' + versioned('assets/tiles/' + file + '-phone.jpg') + '">' +
-      '<img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720"></picture>' +
-      '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span></a>';
+    return '<a class="tile ' + file + '" href="' + href + '">' +
+      '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span>' +
+      '<picture><source media="(max-width: 759px)" srcset="' + versioned('assets/tiles/' + file + '-phone.jpg') + '">' +
+      '<img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720"></picture></a>';
   }
 
   function category(cat, title, lede) {

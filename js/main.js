@@ -24,11 +24,12 @@
       tile('cards/', 'tile-cards', 'Cards') +
       '</div>';
   }
+  var TILE_SIZE = { 'tile-gear': [880, 618], 'tile-signs': [766, 529], 'tile-cards': [780, 531] };
   function tile(href, file, label) {
     return '<a class="tile ' + file + '" href="' + href + '">' +
       '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span>' +
-      '<picture><source media="(max-width: 759px)" srcset="' + versioned('assets/tiles/' + file + '-phone.jpg') + '">' +
-      '<img src="' + versioned('assets/tiles/' + file + '.jpg') + '" alt="" width="1280" height="720"></picture></a>';
+      '<span class="shot"><picture><source srcset="' + versioned('assets/tiles/' + file + '.webp') + '" type="image/webp">' +
+      '<img src="' + versioned('assets/tiles/' + file + '.png') + '" alt="" width="' + TILE_SIZE[file][0] + '" height="' + TILE_SIZE[file][1] + '" decoding="async"></picture></span></a>';
   }
 
   function category(cat, title, lede) {

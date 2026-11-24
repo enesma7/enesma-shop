@@ -24,7 +24,7 @@
       tile('cards/', 'tile-cards', 'Cards') +
       '</div>';
   }
-  var TILE_SIZE = { 'tile-gear': [880, 618], 'tile-signs': [766, 529], 'tile-cards': [780, 531] };
+  var TILE_SIZE = { 'tile-gear': [1744, 1223], 'tile-signs': [1521, 1047], 'tile-cards': [1543, 1046] };
   function tile(href, file, label) {
     return '<a class="tile ' + file + '" href="' + href + '">' +
       '<span class="copy"><b>' + label + '</b><i>Shop Now</i></span>' +

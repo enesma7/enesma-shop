@@ -8,5 +8,5 @@ window.ENESMA_SHOP = {
   HUB_API_URL: 'https://script.google.com/macros/s/AKfycbzYtmzYv74D0yi0sVy-_JaLDYlNLSU795sqhREsqbGYYU1BEDR5KDAB7Du9Mm0Gp4ba/exec',
   HUB_LOGIN_URL: 'https://agent.enesmarealty.com/',
   SITE_NAME: 'ENESMA Shop',
-  ASSET: '20261120t'
+  ASSET: '20261120u'
 };

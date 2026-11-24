@@ -4,7 +4,7 @@
 (function () {
   var KEY = 'enesma_shop_intro_seen';
   var base = window.SHOP_BASE || '/';
-  var asset = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) || '20261123t';
+  var asset = (window.ENESMA_SHOP && window.ENESMA_SHOP.ASSET) || '20261123v';
   var capture = /[?&]intro=capture(?:&|$)/.test(location.search);
   var reduce = false;
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
